@@ -11,7 +11,7 @@ export function useFabricCanvas({
   brushWidth: number;
   tool: Tool;
 }) {
-  const lastUpdatedRef = useRef<number>(0);
+  // const lastUpdatedRef = useRef<number>(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasInstance = useRef<fabric.Canvas | null>(null);
 
@@ -223,7 +223,6 @@ export function useFabricCanvas({
       fab.dispose();
       canvasInstance.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run once on mount
 
   // -----------------------------
@@ -238,33 +237,6 @@ export function useFabricCanvas({
     const canvas = canvasInstance.current;
     if (!canvas) return "";
     return JSON.stringify(canvas.toJSON());
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasInstance.current;
-    if (!canvas) return;
-
-    const markDirty = () => {
-      lastUpdatedRef.current = Date.now();
-    };
-
-    canvas.on("object:modified", () => {
-      (canvas as any).lastModified = Date.now();
-    });
-
-    canvas.on("object:added", () => {
-      (canvas as any).lastModified = Date.now();
-    });
-
-    canvas.on("path:created", () => {
-      (canvas as any).lastModified = Date.now();
-    });
-
-    return () => {
-      canvas.off("object:modified", markDirty);
-      canvas.off("object:added", markDirty);
-      canvas.off("path:created", markDirty);
-    };
   }, []);
 
   // Load canvas from JSON

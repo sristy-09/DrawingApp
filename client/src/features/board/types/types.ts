@@ -1,6 +1,7 @@
 import * as fabric from "fabric";
 
 export type Tool = "select" | "brush" | "rect" | "circle" | "line";
+export type SaveStatus = "idle" | "saving" | "saved";
 
 export interface Board {
   _id: string;
