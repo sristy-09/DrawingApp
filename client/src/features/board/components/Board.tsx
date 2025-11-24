@@ -13,6 +13,10 @@ const Board: React.FC = () => {
     color,
     saveBoard,
     saveStatus,
+    zoom,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetZoom,
   } = useBoard();
 
   return (
@@ -24,6 +28,10 @@ const Board: React.FC = () => {
         setBrushWidth={setBrushWidth}
         onClear={clearCanvas}
         onSave={saveBoard}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onResetZoom={handleResetZoom}
+        zoom={zoom}
       />
 
       <FabricCanvas

@@ -1,6 +1,13 @@
 import * as fabric from "fabric";
 
-export type Tool = "select" | "brush" | "rect" | "circle" | "line";
+export type Tool =
+  | "select"
+  | "brush"
+  | "eraser"
+  | "pan"
+  | "rect"
+  | "circle"
+  | "line";
 export type SaveStatus = "idle" | "saving" | "saved";
 
 export interface Board {
@@ -22,6 +29,10 @@ export interface FabricCanvasRef {
   }) => void;
   loadFromJson: (json: string) => void; //  Load canvas data
   saveToJson: () => string; // Serialize to JSON
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
+  getZoom: () => number;
 }
 
 export interface FabricCanvasProps {
@@ -38,4 +49,8 @@ export interface ToolbarProps {
   setBrushWidth: (width: number) => void;
   onClear: () => void;
   onSave?: () => void; // Manual save
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onResetZoom?: () => void;
+  zoom?: number;
 }

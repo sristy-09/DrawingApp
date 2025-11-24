@@ -11,9 +11,48 @@ export function useFabricCanvas({
   brushWidth: number;
   tool: Tool;
 }) {
-  // const lastUpdatedRef = useRef<number>(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasInstance = useRef<fabric.Canvas | null>(null);
+  const isPanningRef = useRef<boolean>(false);
+  const lastPosXRef = useRef<number>(0);
+  const lastPosYRef = useRef<number>(0);
+
+  // -----------------------------
+  // ZOOM FUNCTIONS
+  // -----------------------------
+  const zoomIn = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    const currentZoom = canvas.getZoom();
+    const newZoom = Math.min(currentZoom * 1.1, 5); // Max 5x zoom
+    canvas.setZoom(newZoom);
+    canvas.renderAll();
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    const currentZoom = canvas.getZoom();
+    const newZoom = Math.max(currentZoom / 1.1, 0.1); // Min 0.1x zoom
+    canvas.setZoom(newZoom);
+    canvas.renderAll();
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    canvas.setZoom(1);
+    canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+    canvas.renderAll();
+  }, []);
+
+  const getZoom = useCallback(() => {
+    const canvas = canvasInstance.current;
+    return canvas ? canvas.getZoom() : 1;
+  }, []);
 
   // -----------------------------
   // APPLY SETTINGS
@@ -31,9 +70,19 @@ export function useFabricCanvas({
       const canvas = canvasInstance.current;
       if (!canvas) return;
 
-      canvas.isDrawingMode = _tool === "brush";
+      // Reset panning
+      isPanningRef.current = false;
+
+      canvas.isDrawingMode = _tool === "brush" || _tool === "eraser";
       canvas.selection = _tool === "select";
-      canvas.defaultCursor = _tool === "brush" ? "crosshair" : "default";
+
+      if (_tool === "pan") {
+        canvas.defaultCursor = "grab";
+      } else if (_tool === "brush" || _tool === "eraser") {
+        canvas.defaultCursor = "crosshair";
+      } else {
+        canvas.defaultCursor = "default";
+      }
 
       // Make all objects selectable or not based on tool
       canvas.forEachObject((obj) => {
@@ -48,8 +97,14 @@ export function useFabricCanvas({
         canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
       }
 
-      canvas.freeDrawingBrush.color = _color;
-      canvas.freeDrawingBrush.width = _width;
+      // Configure brush for drawing or erasing
+      if (_tool === "eraser") {
+        canvas.freeDrawingBrush.color = "#FFFFFF"; // White for eraser
+        canvas.freeDrawingBrush.width = _width * 2; // Eraser is wider
+      } else {
+        canvas.freeDrawingBrush.color = _color;
+        canvas.freeDrawingBrush.width = _width;
+      }
 
       // Discard active selection when switching away from select tool
       if (_tool !== "select") {
@@ -62,21 +117,61 @@ export function useFabricCanvas({
       canvas.off("mouse:down");
       canvas.off("mouse:move");
       canvas.off("mouse:up");
-
-      // Also listen to path created event to make brush strokes follow the same pattern
       canvas.off("path:created");
 
-      // When a brush stroke is completed, set its initial selectability
-      if (_tool === "brush") {
+      // Handle brush and eraser
+      if (_tool === "brush" || _tool === "eraser") {
         canvas.on("path:created", (e) => {
           if (e.path) {
             e.path.selectable = false;
             e.path.evented = false;
+
+            // For eraser, set globalCompositeOperation to erase
+            if (_tool === "eraser") {
+              e.path.globalCompositeOperation = "destination-out";
+            }
           }
         });
       }
 
-      if (_tool !== "brush" && _tool !== "select") {
+      // Handle pan tool
+      if (_tool === "pan") {
+        canvas.on("mouse:down", (e) => {
+          const evt = e.e as MouseEvent | PointerEvent;
+          if (evt.altKey || _tool === "pan") {
+            isPanningRef.current = true;
+            canvas.defaultCursor = "grabbing";
+            canvas.selection = false;
+            lastPosXRef.current = evt.clientX;
+            lastPosYRef.current = evt.clientY;
+          }
+        });
+
+        canvas.on("mouse:move", (e) => {
+          const evt = e.e as MouseEvent | PointerEvent;
+          if (isPanningRef.current && canvas.viewportTransform) {
+            const vpt = canvas.viewportTransform;
+            vpt[4] += evt.clientX - lastPosXRef.current;
+            vpt[5] += evt.clientY - lastPosYRef.current;
+            canvas.requestRenderAll();
+            lastPosXRef.current = evt.clientX;
+            lastPosYRef.current = evt.clientY;
+          }
+        });
+
+        canvas.on("mouse:up", () => {
+          isPanningRef.current = false;
+          canvas.defaultCursor = "grab";
+        });
+      }
+
+      // Handle shape drawing tools
+      if (
+        _tool !== "brush" &&
+        _tool !== "eraser" &&
+        _tool !== "select" &&
+        _tool !== "pan"
+      ) {
         let shape: fabric.Object | null = null;
         let isDrawing = false;
         let startX = 0;
@@ -157,14 +252,13 @@ export function useFabricCanvas({
 
         const onUp = () => {
           if (shape && isDrawing) {
-            // Explicitly set all properties to ensure they stick
             shape.set({
               selectable: false,
               evented: false,
               hasControls: false,
               hasBorders: false,
             });
-            shape.setCoords(); // Update coordinates
+            shape.setCoords();
           }
           isDrawing = false;
           shape = null;
@@ -203,6 +297,7 @@ export function useFabricCanvas({
     const fab = new fabric.Canvas(el, {
       isDrawingMode: tool === "brush",
       selection: tool === "select",
+      backgroundColor: "#FFFFFF",
     });
 
     canvasInstance.current = fab;
@@ -218,12 +313,28 @@ export function useFabricCanvas({
     resize();
     window.addEventListener("resize", resize);
 
+    // Mouse wheel zoom
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY;
+      let zoom = fab.getZoom();
+      zoom *= 0.999 ** delta;
+      if (zoom > 5) zoom = 5;
+      if (zoom < 0.1) zoom = 0.1;
+
+      fab.zoomToPoint(new fabric.Point(e.offsetX, e.offsetY), zoom);
+      fab.renderAll();
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+
     return () => {
       window.removeEventListener("resize", resize);
+      el.removeEventListener("wheel", handleWheel);
       fab.dispose();
       canvasInstance.current = null;
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, []);
 
   // -----------------------------
   // UPDATE SETTINGS WHEN PROPS CHANGE
@@ -257,5 +368,9 @@ export function useFabricCanvas({
     applySettings,
     loadFromJson,
     saveToJson,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    getZoom,
   };
 }

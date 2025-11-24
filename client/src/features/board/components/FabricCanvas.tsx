@@ -14,6 +14,10 @@ const FabricCanvas = React.forwardRef(
       applySettings,
       loadFromJson,
       saveToJson,
+      zoomIn,
+      zoomOut,
+      resetZoom,
+      getZoom,
     } = useFabricCanvas({
       color,
       brushWidth,
@@ -27,6 +31,10 @@ const FabricCanvas = React.forwardRef(
       applySettings,
       loadFromJson,
       saveToJson,
+      zoomIn,
+      zoomOut,
+      resetZoom,
+      getZoom,
     }));
 
     return <canvas ref={canvasRef} className="border w-screen h-screen" />;

@@ -13,6 +13,7 @@ export function useBoard() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
     "idle"
   );
+  const [zoom, setZoom] = useState<number>(1);
 
   const lastSavedDataRef = useRef<string>("");
 
@@ -105,6 +106,20 @@ export function useBoard() {
     canvasRef.current.applySettings({ color, brushWidth, tool });
   }, [color, brushWidth, tool]);
 
+  // Update zoom state
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (canvasRef.current) {
+        setZoom(canvasRef.current.getZoom());
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleZoomIn = () => canvasRef.current?.zoomIn();
+  const handleZoomOut = () => canvasRef.current?.zoomOut();
+  const handleResetZoom = () => canvasRef.current?.resetZoom();
+
   return {
     canvasRef,
     color,
@@ -116,5 +131,9 @@ export function useBoard() {
     clearCanvas,
     saveBoard,
     saveStatus,
+    zoom,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetZoom,
   };
 }
