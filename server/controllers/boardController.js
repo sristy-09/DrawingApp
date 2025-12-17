@@ -80,7 +80,7 @@ export const getBoardById = async (req, res) => {
 export const updateBoard = async (req, res) => {
   try {
     const { id } = req.params;
-    const { canvasData, title, description, isPublic } = req.body; // Allow partial updates
+    const { canvasData, title, description, thumbnail, isPublic } = req.body; // Allow partial updates
 
     const board = await Board.findById(id)
       .populate("owner", "username email avatar")
@@ -105,6 +105,7 @@ export const updateBoard = async (req, res) => {
     if (canvasData !== undefined) board.canvasData = canvasData;
     if (title !== undefined) board.title = title;
     if (description !== undefined) board.description = description;
+    if (thumbnail !== undefined) board.thumbnail = thumbnail;
     if (isPublic !== undefined) board.isPublic = isPublic;
     board.updatedAt = Date.now(); // Auto-update timestamp
 

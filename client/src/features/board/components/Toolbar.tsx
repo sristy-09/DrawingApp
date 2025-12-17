@@ -7,7 +7,6 @@ import {
   FaRegSquare,
   FaSearchMinus,
   FaSearchPlus,
-  FaExpandArrowsAlt,
   FaEraser,
   FaHandPaper,
 } from "react-icons/fa";
@@ -81,22 +80,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
         >
           <FaSearchMinus />
         </button>
-        <span className="text-sm text-gray-600 min-w-[60px] text-center">
+        <button
+          onClick={onResetZoom}
+          className="text-sm text-gray-600 min-w-[60px] text-center px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors"
+          title="Reset Zoom"
+        >
           {Math.round(zoom * 100)}%
-        </span>
+        </button>
         <button
           onClick={onZoomIn}
           className="px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors"
           title="Zoom In"
         >
           <FaSearchPlus />
-        </button>
-        <button
-          onClick={onResetZoom}
-          className="px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors"
-          title="Reset Zoom"
-        >
-          <FaExpandArrowsAlt />
         </button>
       </div>
 

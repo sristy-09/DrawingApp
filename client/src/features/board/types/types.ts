@@ -15,6 +15,7 @@ export interface Board {
   title: string;
   description?: string;
   canvasData?: string;
+  thumbnail?: string;
   isPublic: boolean;
   owner: { username: string };
 }
@@ -33,6 +34,7 @@ export interface FabricCanvasRef {
   zoomOut: () => void;
   resetZoom: () => void;
   getZoom: () => number;
+  getThumbnail: (width?: number, height?: number) => string;
 }
 
 export interface FabricCanvasProps {

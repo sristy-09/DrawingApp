@@ -30,7 +30,10 @@ const boardSchema = new mongoose.Schema({
       },
     },
   ],
-  thumbnail: String,
+  thumbnail: {
+    type: String,
+    default: "",
+  },
   canvasData: {
     type: String,
     default: "{}",

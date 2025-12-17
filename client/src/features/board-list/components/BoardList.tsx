@@ -51,7 +51,14 @@ const BoardList: React.FC<BoardListProps> = ({ board }) => {
       </CardHeader>
 
       <CardContent>
-        <div className="bg-amber-200 h-20 w-40" />
+        {board.thumbnail ? (
+          <img
+            src={board.thumbnail}
+            className="w-60 h-30 object-cover border-2"
+          />
+        ) : (
+          <div className="bg-amber-200 h-30 w-60" />
+        )}
       </CardContent>
 
       <CardFooter className="flex justify-between items-center text-sm text-gray-500">

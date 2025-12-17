@@ -10,9 +10,7 @@ function AuthSuccess() {
   useEffect(() => {
     const handleAuth = async () => {
       const params = new URLSearchParams(window.location.search);
-      console.log(params);
       const accessToken = params.get("token");
-      console.log("Access Token:", accessToken);
 
       if (accessToken) {
         localStorage.setItem("token", accessToken);

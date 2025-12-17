@@ -55,6 +55,44 @@ export function useFabricCanvas({
   }, []);
 
   // -----------------------------
+  // THUMBNAIL GENERATION
+  // -----------------------------
+  const getThumbnail = useCallback((width = 300, height = 200) => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return "";
+
+    // Store current zoom and viewport
+    const currentZoom = canvas.getZoom();
+    const currentVPT = canvas.viewportTransform?.slice() as
+      | fabric.TMat2D
+      | undefined;
+
+    // Reset zoom and viewport for thumbnail
+    canvas.setZoom(1);
+    canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+    canvas.renderAll();
+
+    // Generate thumbnail as data URL
+    const dataURL = canvas.toDataURL({
+      format: "png",
+      quality: 0.8,
+      multiplier: Math.min(
+        width / canvas.getWidth(),
+        height / canvas.getHeight()
+      ),
+    });
+
+    // Restore zoom and viewport
+    canvas.setZoom(currentZoom);
+    if (currentVPT) {
+      canvas.viewportTransform = currentVPT;
+    }
+    canvas.renderAll();
+
+    return dataURL;
+  }, []);
+
+  // -----------------------------
   // APPLY SETTINGS
   // -----------------------------
   const applySettings = useCallback(
@@ -313,24 +351,85 @@ export function useFabricCanvas({
     resize();
     window.addEventListener("resize", resize);
 
-    // Mouse wheel zoom
+    // Enhanced wheel zoom - works with both mouse and touchpad
     const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const delta = e.deltaY;
-      let zoom = fab.getZoom();
-      zoom *= 0.999 ** delta;
-      if (zoom > 5) zoom = 5;
-      if (zoom < 0.1) zoom = 0.1;
+      console.log("🖱️ WHEEL EVENT FIRED:", {
+        deltaY: e.deltaY,
+        deltaX: e.deltaX,
+        deltaMode: e.deltaMode,
+        ctrlKey: e.ctrlKey,
+        type: e.type,
+      });
 
-      fab.zoomToPoint(new fabric.Point(e.offsetX, e.offsetY), zoom);
-      fab.renderAll();
+      e.preventDefault();
+      e.stopPropagation();
+
+      let zoom = fab.getZoom();
+      console.log("📊 Current zoom before:", zoom);
+
+      const delta = e.deltaY;
+
+      // Multiple detection methods
+      const isTouchpad =
+        Math.abs(delta) < 50 || e.ctrlKey || Math.abs(e.deltaX) > 0;
+      console.log("📱 Detected as:", isTouchpad ? "TOUCHPAD" : "MOUSE WHEEL");
+
+      // Apply zoom with different sensitivities
+      if (isTouchpad) {
+        // For touchpad - more gradual
+        zoom *= 1 - delta * 0.01;
+        console.log("🔧 Touchpad zoom calculation:", delta * 0.01);
+      } else {
+        // For mouse wheel - discrete steps
+        zoom *= delta > 0 ? 0.9 : 1.1;
+        console.log(
+          "🔧 Mouse wheel zoom:",
+          delta > 0 ? "OUT (0.9)" : "IN (1.1)"
+        );
+      }
+
+      // Clamp zoom
+      const oldZoom = zoom;
+      zoom = Math.max(0.1, Math.min(5, zoom));
+      console.log(
+        "🔍 New zoom after:",
+        zoom,
+        oldZoom !== zoom ? "(CLAMPED)" : ""
+      );
+
+      // Apply zoom to canvas
+      try {
+        const point = new fabric.Point(e.offsetX, e.offsetY);
+        fab.zoomToPoint(point, zoom);
+        fab.renderAll();
+        console.log("✅ Zoom applied successfully");
+      } catch (error) {
+        console.error("❌ Zoom failed:", error);
+      }
     };
 
+    // Try multiple event registration methods
     el.addEventListener("wheel", handleWheel, { passive: false });
+    el.addEventListener("mousewheel", handleWheel as any, { passive: false });
+
+    console.log("🎯 Wheel event listeners registered on canvas element");
+    console.log("Canvas element:", el);
+    console.log("Canvas size:", el.width, "x", el.height);
+
+    // Additional: Handle Ctrl+Wheel zoom (common on Windows touchpads)
+    const handleKeyWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        handleWheel(e);
+      }
+    };
+
+    el.addEventListener("wheel", handleKeyWheel, { passive: false });
 
     return () => {
       window.removeEventListener("resize", resize);
       el.removeEventListener("wheel", handleWheel);
+      el.removeEventListener("wheel", handleKeyWheel);
       fab.dispose();
       canvasInstance.current = null;
     };
@@ -372,5 +471,6 @@ export function useFabricCanvas({
     zoomOut,
     resetZoom,
     getZoom,
+    getThumbnail,
   };
 }

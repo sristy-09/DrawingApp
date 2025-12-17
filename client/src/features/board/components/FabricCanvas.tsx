@@ -18,6 +18,7 @@ const FabricCanvas = React.forwardRef(
       zoomOut,
       resetZoom,
       getZoom,
+      getThumbnail,
     } = useFabricCanvas({
       color,
       brushWidth,
@@ -35,6 +36,7 @@ const FabricCanvas = React.forwardRef(
       zoomOut,
       resetZoom,
       getZoom,
+      getThumbnail,
     }));
 
     return <canvas ref={canvasRef} className="border w-screen h-screen" />;
