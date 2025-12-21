@@ -111,12 +111,14 @@ export function useFabricCanvas({
       // Reset panning
       isPanningRef.current = false;
 
-      canvas.isDrawingMode = _tool === "brush" || _tool === "eraser";
+      canvas.isDrawingMode = _tool === "brush";
       canvas.selection = _tool === "select";
 
       if (_tool === "pan") {
         canvas.defaultCursor = "grab";
-      } else if (_tool === "brush" || _tool === "eraser") {
+      } else if (_tool === "brush") {
+        canvas.defaultCursor = "crosshair";
+      } else if (_tool === "eraser") {
         canvas.defaultCursor = "crosshair";
       } else {
         canvas.defaultCursor = "default";
@@ -135,11 +137,9 @@ export function useFabricCanvas({
         canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
       }
 
-      // Configure brush for drawing or erasing
-      if (_tool === "eraser") {
-        canvas.freeDrawingBrush.color = "#FFFFFF"; // White for eraser
-        canvas.freeDrawingBrush.width = _width * 2; // Eraser is wider
-      } else {
+      // Configure brush for drawing
+      if (_tool === "brush") {
+        canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
         canvas.freeDrawingBrush.color = _color;
         canvas.freeDrawingBrush.width = _width;
       }
@@ -157,18 +157,110 @@ export function useFabricCanvas({
       canvas.off("mouse:up");
       canvas.off("path:created");
 
-      // Handle brush and eraser
-      if (_tool === "brush" || _tool === "eraser") {
+      // Handle brush drawing
+      if (_tool === "brush") {
         canvas.on("path:created", (e) => {
           if (e.path) {
             e.path.selectable = false;
             e.path.evented = false;
-
-            // For eraser, set globalCompositeOperation to erase
-            if (_tool === "eraser") {
-              e.path.globalCompositeOperation = "destination-out";
-            }
           }
+        });
+      }
+
+      // Handle eraser - drag to select and preview deletion
+      if (_tool === "eraser") {
+        let isErasing = false;
+        let eraserCircle: fabric.Circle | null = null;
+        let touchedObjects: Set<fabric.Object> = new Set();
+        const eraserRadius = _width * 3; // Eraser size
+
+        const checkObjectIntersection = (obj: fabric.Object, cursorX: number, cursorY: number): boolean => {
+          if (obj === eraserCircle) return false;
+
+          const objBounds = obj.getBoundingRect();
+          const distance = Math.sqrt(
+            Math.pow(cursorX - (objBounds.left + objBounds.width / 2), 2) +
+            Math.pow(cursorY - (objBounds.top + objBounds.height / 2), 2)
+          );
+
+          // Check if cursor circle intersects with object
+          return distance < eraserRadius + Math.max(objBounds.width, objBounds.height) / 2;
+        };
+
+        canvas.on("mouse:down", (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+          isErasing = true;
+          touchedObjects.clear();
+          const pointer = canvas.getPointer(e.e);
+
+          // Create eraser circle cursor
+          eraserCircle = new fabric.Circle({
+            left: pointer.x,
+            top: pointer.y,
+            radius: eraserRadius,
+            fill: "transparent",
+            stroke: "#999999",
+            strokeWidth: 2,
+            strokeDasharray: [5, 5],
+            selectable: false,
+            evented: false,
+            opacity: 0.6,
+            originX: "center",
+            originY: "center",
+          });
+          canvas.add(eraserCircle);
+        });
+
+        canvas.on("mouse:move", (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+          if (!isErasing || !eraserCircle) return;
+
+          const pointer = canvas.getPointer(e.e);
+
+          // Move eraser circle with cursor
+          eraserCircle.set({
+            left: pointer.x,
+            top: pointer.y,
+          });
+
+          // Check intersection with all objects
+          canvas.forEachObject((obj) => {
+            if (obj === eraserCircle) return;
+
+            const isIntersecting = checkObjectIntersection(obj, pointer.x, pointer.y);
+
+            if (isIntersecting) {
+              if (!touchedObjects.has(obj)) {
+                touchedObjects.add(obj);
+                obj.set({ opacity: 0.3 }); // Preview deletion
+              }
+            } else {
+              if (touchedObjects.has(obj)) {
+                obj.set({ opacity: 1 }); // Restore opacity
+                touchedObjects.delete(obj);
+              }
+            }
+          });
+
+          canvas.renderAll();
+        });
+
+        canvas.on("mouse:up", () => {
+          if (!isErasing) return;
+
+          isErasing = false;
+
+          // Remove the eraser circle
+          if (eraserCircle) {
+            canvas.remove(eraserCircle);
+            eraserCircle = null;
+          }
+
+          // Delete all touched objects
+          touchedObjects.forEach((obj) => {
+            canvas.remove(obj);
+          });
+          touchedObjects.clear();
+
+          canvas.renderAll();
         });
       }
 
@@ -351,85 +443,34 @@ export function useFabricCanvas({
     resize();
     window.addEventListener("resize", resize);
 
-    // Enhanced wheel zoom - works with both mouse and touchpad
-    const handleWheel = (e: WheelEvent) => {
-      console.log("🖱️ WHEEL EVENT FIRED:", {
-        deltaY: e.deltaY,
-        deltaX: e.deltaX,
-        deltaMode: e.deltaMode,
-        ctrlKey: e.ctrlKey,
-        type: e.type,
-      });
-
+    // Use Fabric.js built-in mouse:wheel event for zoom
+    fab.on("mouse:wheel", (opt) => {
+      const e = opt.e as WheelEvent;
       e.preventDefault();
       e.stopPropagation();
 
-      let zoom = fab.getZoom();
-      console.log("📊 Current zoom before:", zoom);
-
       const delta = e.deltaY;
+      let zoom = fab.getZoom();
 
-      // Multiple detection methods
-      const isTouchpad =
-        Math.abs(delta) < 50 || e.ctrlKey || Math.abs(e.deltaX) > 0;
-      console.log("📱 Detected as:", isTouchpad ? "TOUCHPAD" : "MOUSE WHEEL");
-
-      // Apply zoom with different sensitivities
-      if (isTouchpad) {
-        // For touchpad - more gradual
-        zoom *= 1 - delta * 0.01;
-        console.log("🔧 Touchpad zoom calculation:", delta * 0.01);
+      // Apply zoom - scroll up (negative delta) = zoom in, scroll down (positive delta) = zoom out
+      let newZoom: number;
+      if (delta < 0) {
+        newZoom = zoom * 1.05; // Zoom in
       } else {
-        // For mouse wheel - discrete steps
-        zoom *= delta > 0 ? 0.9 : 1.1;
-        console.log(
-          "🔧 Mouse wheel zoom:",
-          delta > 0 ? "OUT (0.9)" : "IN (1.1)"
-        );
+        newZoom = zoom * 0.95; // Zoom out
       }
 
-      // Clamp zoom
-      const oldZoom = zoom;
-      zoom = Math.max(0.1, Math.min(5, zoom));
-      console.log(
-        "🔍 New zoom after:",
-        zoom,
-        oldZoom !== zoom ? "(CLAMPED)" : ""
-      );
+      // Clamp zoom between 0.1x and 5x
+      newZoom = Math.max(0.1, Math.min(5, newZoom));
 
-      // Apply zoom to canvas
-      try {
-        const point = new fabric.Point(e.offsetX, e.offsetY);
-        fab.zoomToPoint(point, zoom);
-        fab.renderAll();
-        console.log("✅ Zoom applied successfully");
-      } catch (error) {
-        console.error("❌ Zoom failed:", error);
-      }
-    };
-
-    // Try multiple event registration methods
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    el.addEventListener("mousewheel", handleWheel as any, { passive: false });
-
-    console.log("🎯 Wheel event listeners registered on canvas element");
-    console.log("Canvas element:", el);
-    console.log("Canvas size:", el.width, "x", el.height);
-
-    // Additional: Handle Ctrl+Wheel zoom (common on Windows touchpads)
-    const handleKeyWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
-        handleWheel(e);
-      }
-    };
-
-    el.addEventListener("wheel", handleKeyWheel, { passive: false });
+      // Zoom at cursor position
+      fab.zoomToPoint(new fabric.Point(e.offsetX, e.offsetY), newZoom);
+      fab.renderAll();
+    });
 
     return () => {
       window.removeEventListener("resize", resize);
-      el.removeEventListener("wheel", handleWheel);
-      el.removeEventListener("wheel", handleKeyWheel);
+      fab.off("mouse:wheel");
       fab.dispose();
       canvasInstance.current = null;
     };
