@@ -116,6 +116,17 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Prevent browser zoom */
+    touch-action: manipulation;
+  }
+  html {
+    /* Prevent browser zoom on all devices */
+    touch-action: manipulation;
+  }
+  canvas {
+    /* Ensure canvas doesn't get zoomed */
+    touch-action: none;
+    display: block;
   }
    button:not(:disabled),
   [role="button"]:not(:disabled) {

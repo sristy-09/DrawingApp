@@ -47,7 +47,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         try {
           axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-          const response = await axios.get("http://localhost:3000/auth/me");
+          const response = await axios.get("/auth/me");
           setUser(response.data.user);
         } catch (error) {
           localStorage.removeItem("token");
@@ -62,7 +62,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const login = async (credentials: Credentials): Promise<void> => {
     try {
       const response = await axios.post<{ token: string; user: User }>(
-        "http://localhost:3000/auth/login",
+        "/auth/login",
         credentials
       );
       const { token, user } = response.data;

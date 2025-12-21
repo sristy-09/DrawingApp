@@ -15,7 +15,7 @@ import { useSignup } from "../hooks/useSignup";
 import { Link } from "react-router";
 
 function SignUpPage() {
-  const { handleSubmit, myForm, handleChange } = useSignup();
+  const { handleSubmit, myForm, handleChange, error, loading } = useSignup();
 
   return (
     <div className="flex justify-center items-center mt-40">
@@ -35,8 +35,13 @@ function SignUpPage() {
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
+              {error && (
+                <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {error}
+                </div>
+              )}
               <div className="grid gap-2">
-                <Label htmlFor="email">Username:</Label>
+                <Label htmlFor="username">Username:</Label>
                 <Input
                   id="username"
                   type="text"
@@ -45,6 +50,7 @@ function SignUpPage() {
                   value={myForm.username}
                   onChange={handleChange}
                   required
+                  disabled={loading}
                 />
               </div>
               <div className="grid gap-2">
@@ -57,6 +63,7 @@ function SignUpPage() {
                   value={myForm.email}
                   onChange={handleChange}
                   required
+                  disabled={loading}
                 />
               </div>
               <div className="grid gap-2">
@@ -68,14 +75,16 @@ function SignUpPage() {
                   value={myForm.password}
                   name="password"
                   onChange={handleChange}
+                  disabled={loading}
                 />
               </div>
 
               <Button
                 type="submit"
                 className="w-full bg-[#065f46] hover:bg-[#0a7b5b]"
+                disabled={loading}
               >
-                Sign Up
+                {loading ? "Signing Up..." : "Sign Up"}
               </Button>
             </div>
           </form>
@@ -87,6 +96,7 @@ function SignUpPage() {
             }
             variant="outline"
             className="w-full"
+            disabled={loading}
           >
             <FaGoogle />
             Login with Google
