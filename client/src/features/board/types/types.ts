@@ -47,5 +47,4 @@ export interface FabricCanvasProps {
 export interface ToolbarProps {
   tool: Tool;
   setTool: (tool: Tool) => void;
-  onMenuToggle: () => void;
 }

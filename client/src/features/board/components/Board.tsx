@@ -1,7 +1,7 @@
 import Toolbar from "./Toolbar";
 import FabricCanvas from "./FabricCanvas";
 import { useBoard } from "../hooks/useBoard";
-import { FaSearchMinus, FaSearchPlus, FaTimes } from "react-icons/fa";
+import { FaBars, FaSearchMinus, FaSearchPlus, FaTimes } from "react-icons/fa";
 import { useState } from "react";
 
 const Board: React.FC = () => {
@@ -35,11 +35,7 @@ const Board: React.FC = () => {
 
   return (
     <div className="board-container h-screen w-screen overflow-hidden relative">
-      <Toolbar
-        tool={tool}
-        setTool={setTool}
-        onMenuToggle={() => setMenuOpen(!menuOpen)}
-      />
+      <Toolbar tool={tool} setTool={setTool} />
 
       <FabricCanvas
         ref={canvasRef}
@@ -48,6 +44,17 @@ const Board: React.FC = () => {
         tool={tool}
       />
 
+      {/* Hamburger Menu Button - Top Left Corner */}
+      <div className="fixed top-4 left-4 z-30">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="p-2 hover:bg-gray-200 bg-white rounded-lg transition-colors shadow-lg border-2 border-gray-300"
+          title="Menu"
+        >
+          <FaBars className="text-gray-700 text-xl" />
+        </button>
+      </div>
+
       {/* Hamburger Menu Sidebar */}
       <div
         className={`fixed top-0 left-0 h-full w-80 bg-white bg-opacity-95 backdrop-blur-sm shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
@@ -55,11 +62,11 @@ const Board: React.FC = () => {
         }`}
       >
         {/* Menu header */}
-        <div className="flex items-center justify-between p-4 border-b bg-gray-100 bg-opacity-90">
+        <div className="flex items-center justify-between p-2 border-b bg-gray-100 bg-opacity-90">
           <h2 className="text-lg font-semibold text-gray-800">Settings</h2>
           <button
             onClick={() => setMenuOpen(false)}
-            className="p-2 hover:bg-gray-200 rounded transition-colors"
+            className="p-1 hover:bg-gray-200 rounded transition-colors"
             title="Close"
           >
             <FaTimes className="text-gray-700 text-xl" />
@@ -67,7 +74,7 @@ const Board: React.FC = () => {
         </div>
 
         {/* Menu Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-3 space-y-4">
           {/* Brush Width Control */}
           <div className="space-y-3">
             <label className="block text-sm font-medium text-gray-700">
@@ -103,10 +110,10 @@ const Board: React.FC = () => {
           <div className="border-t border-gray-200"></div>
 
           {/* Action Buttons */}
-          <div className="space-y-3">
+          <div className="flex items-center justify-center space-x-2">
             <button
               onClick={handleClear}
-              className="w-full px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center justify-center space-x-2"
+              className="px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center justify-center space-x-2"
             >
               <svg
                 className="w-5 h-5"
@@ -126,7 +133,7 @@ const Board: React.FC = () => {
 
             <button
               onClick={handleSave}
-              className="w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium flex items-center justify-center space-x-2"
+              className="px-2 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium flex items-center justify-center space-x-2"
             >
               <svg
                 className="w-5 h-5"
@@ -148,10 +155,10 @@ const Board: React.FC = () => {
       </div>
 
       {/* Zoom Controls - Bottom Left */}
-      <div className="fixed bottom-4 left-4 z-50 flex items-center space-x-2 bg-white border-2 border-gray-300 rounded-lg shadow-lg p-2">
+      <div className="fixed bottom-4 left-4 z-50 flex items-center space-x-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg p-2">
         <button
           onClick={handleZoomOut}
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
+          className="p-1 hover:bg-gray-100 rounded transition-colors"
           title="Zoom Out"
         >
           <FaSearchMinus className="text-gray-700" />
@@ -159,7 +166,7 @@ const Board: React.FC = () => {
 
         <button
           onClick={handleResetZoom}
-          className="text-sm text-gray-700 font-medium min-w-[60px] text-center px-3 py-1 hover:bg-gray-100 rounded transition-colors"
+          className="text-sm text-gray-700 font-medium min-w-[60px] text-center px-2 py-1 hover:bg-gray-100 rounded transition-colors"
           title="Reset Zoom"
         >
           {Math.round(zoom * 100)}%
@@ -167,7 +174,7 @@ const Board: React.FC = () => {
 
         <button
           onClick={handleZoomIn}
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
+          className="p-1 hover:bg-gray-100 rounded transition-colors"
           title="Zoom In"
         >
           <FaSearchPlus className="text-gray-700" />

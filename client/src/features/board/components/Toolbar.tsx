@@ -7,7 +7,6 @@ import {
   FaRegSquare,
   FaEraser,
   FaHandPaper,
-  FaBars,
 } from "react-icons/fa";
 import type { Tool, ToolbarProps } from "../types/types";
 
@@ -21,27 +20,18 @@ const toolIcons: Record<Tool, JSX.Element> = {
   line: <FaMinus />,
 };
 
-const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool, onMenuToggle }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool }) => {
   return (
-    <div className="flex flex-wrap gap-4 items-center justify-between p-4 bg-gray-100 border-b">
-      {/* Hamburger Menu Button */}
-      <button
-        onClick={onMenuToggle}
-        className="p-2 hover:bg-gray-200 rounded transition-colors"
-        title="Menu"
-      >
-        <FaBars className="text-gray-700 text-xl" />
-      </button>
-
+    <>
       {/* Drawing Tools */}
-      <div className="flex space-x-2 rounded">
+      <div className="fixed right-4 top-1/2 transform -translate-y-1/2 z-40 flex flex-col space-y-4 bg-white border-2 border-gray-300 rounded-xl shadow-lg p-1">
         {Object.keys(toolIcons).map((key) => {
           const typedKey = key as Tool;
           return (
             <button
               key={typedKey}
               onClick={() => setTool(typedKey)}
-              className={`px-4 py-2 rounded border transition-colors ${
+              className={`px-1 py-1 rounded border transition-colors ${
                 tool === typedKey
                   ? "bg-blue-500 text-white border-blue-500"
                   : "bg-white text-gray-700 border-gray-300 hover:bg-gray-200"
@@ -53,7 +43,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool, onMenuToggle }) => {
           );
         })}
       </div>
-    </div>
+    </>
   );
 };
 
