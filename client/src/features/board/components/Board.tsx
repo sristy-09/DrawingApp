@@ -1,6 +1,7 @@
 import Toolbar from "./Toolbar";
 import FabricCanvas from "./FabricCanvas";
 import { useBoard } from "../hooks/useBoard";
+import { FaSearchMinus, FaSearchPlus } from "react-icons/fa";
 
 const Board: React.FC = () => {
   const {
@@ -13,7 +14,7 @@ const Board: React.FC = () => {
     color,
     saveBoard,
     saveStatus,
-    zoom,
+    zoom = 1,
     handleZoomIn,
     handleZoomOut,
     handleResetZoom,
@@ -28,10 +29,6 @@ const Board: React.FC = () => {
         setBrushWidth={setBrushWidth}
         onClear={clearCanvas}
         onSave={saveBoard}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onResetZoom={handleResetZoom}
-        zoom={zoom}
       />
 
       <FabricCanvas
@@ -40,6 +37,33 @@ const Board: React.FC = () => {
         brushWidth={brushWidth}
         tool={tool}
       />
+
+      {/* Zoom Controls - Bottom Left */}
+      <div className="fixed bottom-4 left-4 z-50 flex items-center space-x-2 bg-white border-2 border-gray-300 rounded-lg shadow-lg p-2">
+        <button
+          onClick={handleZoomOut}
+          className="p-2 hover:bg-gray-100 rounded transition-colors"
+          title="Zoom Out"
+        >
+          <FaSearchMinus className="text-gray-700" />
+        </button>
+
+        <button
+          onClick={handleResetZoom}
+          className="text-sm text-gray-700 font-medium min-w-[60px] text-center px-3 py-1 hover:bg-gray-100 rounded transition-colors"
+          title="Reset Zoom"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+
+        <button
+          onClick={handleZoomIn}
+          className="p-2 hover:bg-gray-100 rounded transition-colors"
+          title="Zoom In"
+        >
+          <FaSearchPlus className="text-gray-700" />
+        </button>
+      </div>
 
       {/* Save Status Indicator */}
       <div className="fixed bottom-4 right-4 z-50">

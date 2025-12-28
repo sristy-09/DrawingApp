@@ -29,10 +29,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   setBrushWidth,
   onClear,
   onSave,
-  onZoomIn,
-  onZoomOut,
-  onResetZoom,
-  zoom = 1,
 }) => {
   return (
     <div className="flex flex-wrap gap-4 items-center justify-between p-4 bg-gray-100 border-b">
@@ -69,31 +65,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
           className="w-32"
         />
         <span className="text-sm text-gray-600 w-8">{brushWidth}</span>
-      </div>
-
-      {/* Zoom Controls */}
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={onZoomOut}
-          className="px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors"
-          title="Zoom Out"
-        >
-          <FaSearchMinus />
-        </button>
-        <button
-          onClick={onResetZoom}
-          className="text-sm text-gray-600 min-w-[60px] text-center px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors"
-          title="Reset Zoom"
-        >
-          {Math.round(zoom * 100)}%
-        </button>
-        <button
-          onClick={onZoomIn}
-          className="px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors"
-          title="Zoom In"
-        >
-          <FaSearchPlus />
-        </button>
       </div>
 
       {/* Action Buttons */}

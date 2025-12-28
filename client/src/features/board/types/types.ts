@@ -51,8 +51,4 @@ export interface ToolbarProps {
   setBrushWidth: (width: number) => void;
   onClear: () => void;
   onSave?: () => void; // Manual save
-  onZoomIn?: () => void;
-  onZoomOut?: () => void;
-  onResetZoom?: () => void;
-  zoom?: number;
 }
