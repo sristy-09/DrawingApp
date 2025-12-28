@@ -15,7 +15,7 @@ import { Link } from "react-router";
 import { useLogin } from "../hooks/useLogin";
 
 function LoginPage() {
-  const { myForm, handleChange, handleSubmit } = useLogin();
+  const { myForm, handleChange, handleSubmit, errors } = useLogin();
   return (
     <div className="flex justify-center items-center mt-40">
       <Card className="w-full max-w-sm ">
@@ -25,7 +25,7 @@ function LoginPage() {
           <CardAction>
             <Button
               variant="link"
-              className="bg-[#065f46] hover:bg-[#0a7b5b] text-white"
+              className="bg-[#c084fc] hover:bg-[#6b21a8] text-white"
             >
               <Link to={"/signup"}>Sign Up</Link>
             </Button>
@@ -45,6 +45,9 @@ function LoginPage() {
                   onChange={handleChange}
                   required
                 />
+                {errors.email && (
+                  <p className="text-sm text-red-500">{errors.email}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
@@ -56,11 +59,14 @@ function LoginPage() {
                   onChange={handleChange}
                   required
                 />
+                {errors.password && (
+                  <p className="text-sm text-red-500">{errors.password}</p>
+                )}
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-[#065f46] hover:bg-[#0a7b5b]"
+                className="w-full bg-[#c084fc] hover:bg-[#6b21a8]"
               >
                 Login
               </Button>

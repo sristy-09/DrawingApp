@@ -1,77 +1,35 @@
-import { useEffect, useState } from "react";
-import { getData } from "../../../context/userContext";
+import { useEffect } from "react";
 import BoardList from "../../board-list/components/BoardList";
-import axios from "axios";
-import { useNavigate } from "react-router";
-
-export interface Board {
-  _id: string;
-  title: string;
-  description: string;
-  isPublic: boolean;
-  thumbnail?: string;
-  owner?: { username?: string; email?: string };
-  createdAt: string;
-  updatedAt: string;
-}
+import { useUserDashboard } from "../hooks/useUserDashboard";
+import { Moon, Sun } from "lucide-react";
+import { Button } from "../../core/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../core/components/ui/dropdown-menu";
 
 function UserDashboard() {
-  const { user, logout } = getData();
-  const navigate = useNavigate();
-
-  const [boards, setBoards] = useState<Board[]>([]); // <- typed as Board array
-
-  const [newBoard, setNewBoard] = useState<{
-    title: string;
-    description: string;
-    isPublic: boolean;
-  }>({
-    title: "",
-    description: "",
-    isPublic: false,
-  });
-
-  const [showNewBoardForm, setShowNewBoardForm] = useState(false);
+  const {
+    user,
+    boards,
+    newBoard,
+    setNewBoard,
+    showNewBoardForm,
+    setShowNewBoardForm,
+    fetchBoards,
+    createBoard,
+    handleLogout,
+    setTheme,
+  } = useUserDashboard();
 
   useEffect(() => {
     fetchBoards();
   }, []);
 
-  const fetchBoards = async () => {
-    try {
-      const response = await axios.get<Board[]>("http://localhost:3000/board", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      setBoards(response.data ?? []);
-    } catch (error) {
-      console.error("Failed to fetch boards:", error);
-      setBoards([]);
-    }
-  };
-
-  const createBoard = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      await axios.post("http://localhost:3000/board", newBoard, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      setNewBoard({ title: "", description: "", isPublic: false });
-      setShowNewBoardForm(false);
-      fetchBoards();
-    } catch (error) {
-      console.error("Failed to create board:", error);
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
-
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header Section */}
         <div className="flex justify-between items-center mb-8">
@@ -89,6 +47,27 @@ function UserDashboard() {
             >
               Logout
             </button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Sun className="h-[1.2rem] w-[1.2rem] scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+                  <Moon className="absolute h-[1.2rem] w-[1.2rem] scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+                  <span className="sr-only">Toggle theme</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setTheme("light")}>
+                  Light
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("dark")}>
+                  Dark
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("system")}>
+                  System
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

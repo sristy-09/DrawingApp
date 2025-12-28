@@ -5,7 +5,7 @@ import LoginPage from "./features/auth/components/LoginPage";
 import AuthSuccess from "./features/auth/components/AuthSuccess";
 import Board from "./features/board/components/Board";
 import UserDashboard from "./features/User/components/UserDashboard";
-import AuthRoute from "./components/ProtectedRoute";
+import AuthRoute from "./features/core/components/ProtectedRoute";
 
 function App() {
   return (

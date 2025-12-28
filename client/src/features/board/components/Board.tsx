@@ -20,7 +20,7 @@ const Board: React.FC = () => {
   } = useBoard();
 
   return (
-    <div className="h-screen w-screen overflow-hidden relative board-container">
+    <div className="board-container h-screen w-screen overflow-hidden relative">
       <Toolbar
         tool={tool}
         setTool={setTool}

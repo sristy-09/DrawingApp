@@ -15,7 +15,7 @@ import { useSignup } from "../hooks/useSignup";
 import { Link } from "react-router";
 
 function SignUpPage() {
-  const { handleSubmit, myForm, handleChange, error, loading } = useSignup();
+  const { handleSubmit, myForm, handleChange, loading, errors } = useSignup();
 
   return (
     <div className="flex justify-center items-center mt-40">
@@ -26,7 +26,7 @@ function SignUpPage() {
           <CardAction>
             <Button
               variant="link"
-              className=" text-white bg-[#065f46] hover:bg-[#0a7b5b]"
+              className=" text-white bg-[#c084fc] hover:bg-[#6b21a8]"
             >
               <Link to={"/login"}>Log In</Link>
             </Button>
@@ -35,11 +35,6 @@ function SignUpPage() {
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="flex flex-col gap-6">
-              {error && (
-                <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-                  {error}
-                </div>
-              )}
               <div className="grid gap-2">
                 <Label htmlFor="username">Username:</Label>
                 <Input
@@ -52,6 +47,9 @@ function SignUpPage() {
                   required
                   disabled={loading}
                 />
+                {errors.username && (
+                  <p className="text-sm text-red-500">{errors.username}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
@@ -65,6 +63,9 @@ function SignUpPage() {
                   required
                   disabled={loading}
                 />
+                {errors.email && (
+                  <p className="text-sm text-red-500">{errors.email}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
@@ -77,11 +78,14 @@ function SignUpPage() {
                   onChange={handleChange}
                   disabled={loading}
                 />
+                {errors.password && (
+                  <p className="text-sm text-red-500">{errors.password}</p>
+                )}
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-[#065f46] hover:bg-[#0a7b5b]"
+                className="w-full bg-[#c084fc] hover:bg-[#6b21a8]"
                 disabled={loading}
               >
                 {loading ? "Signing Up..." : "Sign Up"}

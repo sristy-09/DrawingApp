@@ -260,6 +260,13 @@ export function useBoard() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.classList.add("board-force-light");
+    return () => {
+      document.documentElement.classList.remove("board-force-light");
+    };
+  }, []);
+
   const handleZoomIn = () => canvasRef.current?.zoomIn();
   const handleZoomOut = () => canvasRef.current?.zoomOut();
   const handleResetZoom = () => canvasRef.current?.resetZoom();

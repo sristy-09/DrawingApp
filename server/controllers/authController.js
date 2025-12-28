@@ -1,33 +1,23 @@
 import bcrypt from "bcryptjs";
 
 // Register new User
-import { User } from "../models/User.js";
+import { loginSchema, User } from "../models/User.js";
 
 export const registerUser = async (req, res) => {
   try {
+    // Validate request body with zod
+    const parsed = loginSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      // Extract field-level errors
+      const errors = parsed.error.flatten().fieldErrors;
+      return res.status(400).json({
+        message: "Validation failed",
+        errors,
+      });
+    }
+
     const { email, username, password } = req.body;
-
-    // Validate required fields
-    if (!email || !username || !password) {
-      return res.status(400).json({
-        message: "Email, username, and password are required",
-      });
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        message: "Please provide a valid email address",
-      });
-    }
-
-    // Validate password length
-    if (password.length < 6) {
-      return res.status(400).json({
-        message: "Password must be at least 6 characters long",
-      });
-    }
 
     // Check if email already exists
     let user = await User.findOne({ email });
@@ -80,34 +70,51 @@ export const registerUser = async (req, res) => {
 
 // Login User
 export const loginUser = async (req, res) => {
-  let user = await User.findOne({ email: req.body.email });
+  try {
+    // Validate request body with zod
+    const parsed = loginSchema.safeParse(req.body);
 
-  if (!user) {
-    return res.status(400).json({ message: "Invalid Email or Password" });
+    if (!parsed.success) {
+      // Extract field-level errors
+      const errors = parsed.error.flatten().fieldErrors;
+      return res.status(400).json({
+        message: "Validation failed",
+        errors,
+      });
+    }
+
+    const { email, password } = parsed.data;
+
+    // Find user
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid Email or Password" });
+    }
+
+    // Check password
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+    if (!isPasswordMatch) {
+      return res.status(400).json({ message: "Invalid Email or Password" });
+    }
+
+    // Generate token
+    const token = user.generateToken();
+
+    res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+      },
+      message: "Login successful",
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({
+      message: "An error occurred during login",
+    });
   }
-
-  // Check password
-  const isPasswordMatch = await bcrypt.compare(
-    req.body.password,
-    user.password
-  );
-
-  if (!isPasswordMatch) {
-    return res.status(400).json({ message: "Invalid Email or Password" });
-  }
-
-  // Generate token
-  const token = user.generateToken();
-
-  res.status(200).json({
-    token,
-    user: {
-      id: user._id,
-      email: user.email,
-      username: user.username,
-    },
-    message: "Login successful",
-  });
 };
 
 export const getProfile = async (req, res) => {

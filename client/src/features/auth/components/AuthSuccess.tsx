@@ -1,6 +1,6 @@
 import axios from "axios";
 import { useEffect } from "react";
-import { getData } from "../../../context/userContext";
+import { getData } from "../../core/context/userContext";
 import { useNavigate } from "react-router";
 
 function AuthSuccess() {

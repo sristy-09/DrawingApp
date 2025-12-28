@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import type { LoginFormType } from "../types/types";
+import type { FormErrors, LoginFormType } from "../types/types";
 import axios from "axios";
-import { getData } from "../../../context/userContext";
+import { getData } from "../../core/context/userContext";
+import { loginSchema } from "../loginSchema";
 
 export function useLogin() {
   const [myForm, setMyForm] = useState<LoginFormType>({
@@ -10,14 +11,33 @@ export function useLogin() {
     password: "",
   });
 
+  const [errors, setErrors] = useState<FormErrors>({});
+
   const { login } = getData();
 
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    // Zod validation
+    const result = loginSchema.safeParse(myForm);
+
+    if (!result.success) {
+      const fieldErrors = result.error.flatten().fieldErrors;
+
+      setErrors({
+        email: fieldErrors.email?.[0],
+        password: fieldErrors.password?.[0],
+      });
+      return;
+    }
+
+    // clear previous errors
+    setErrors({});
+
     try {
-      await login(myForm);
+      await login(result.data);
       navigate("/dashboard");
     } catch (error: unknown) {
       if (axios.isAxiosError(error)) {
@@ -35,7 +55,13 @@ export function useLogin() {
       ...prev,
       [name]: value,
     }));
+
+    // Clear error on change
+    setErrors((prev) => ({
+      ...prev,
+      [name]: undefined,
+    }));
   };
 
-  return { handleChange, handleSubmit, myForm };
+  return { handleChange, handleSubmit, myForm, errors };
 }

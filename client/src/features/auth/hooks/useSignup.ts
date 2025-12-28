@@ -1,7 +1,8 @@
 import { useState } from "react";
-import type { SignUpFormType } from "../types/types";
+import type { FormErrors, SignUpFormType } from "../types/types";
 import { useNavigate } from "react-router";
 import axios from "axios";
+import { signupSchema } from "../signupSchema";
 
 export function useSignup() {
   const [myForm, setMyForm] = useState<SignUpFormType>({
@@ -10,39 +11,43 @@ export function useSignup() {
     password: "",
   });
 
-  const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  const [errors, setErrors] = useState<FormErrors>({});
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
 
-    try {
-      // Client-side validation
-      if (!myForm.username.trim()) {
-        throw new Error("Username is required");
-      }
-      if (!myForm.email.trim()) {
-        throw new Error("Email is required");
-      }
-      if (!myForm.password) {
-        throw new Error("Password is required");
-      }
-      if (myForm.password.length < 6) {
-        throw new Error("Password must be at least 6 characters");
-      }
+    // Zod validation
+    const result = signupSchema.safeParse(myForm);
 
+    if (!result.success) {
+      const fieldErrors = result.error.flatten().fieldErrors;
+
+      setErrors({
+        username: fieldErrors.username?.[0],
+        email: fieldErrors.email?.[0],
+        password: fieldErrors.password?.[0],
+      });
+      setLoading(false);
+      return;
+    }
+
+    // clear previous errors
+    setErrors({});
+
+    try {
       const res = await axios.post("/auth/register", myForm);
-      
+
       // Store token if provided
       if (res.data.token) {
         localStorage.setItem("token", res.data.token);
       }
 
       alert(res.data.message || "Registration Successful");
-      navigate("/");
+      navigate("/dashboard");
     } catch (error: unknown) {
       let errorMessage = "Registration failed";
 
@@ -55,7 +60,6 @@ export function useSignup() {
         errorMessage = error.message;
       }
 
-      setError(errorMessage);
       console.error("Registration error:", errorMessage);
     } finally {
       setLoading(false);
@@ -64,7 +68,12 @@ export function useSignup() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setError(""); // Clear error when user starts typing
+
+    // Clear error on change
+    setErrors((prev) => ({
+      ...prev,
+      [name]: undefined,
+    }));
 
     setMyForm((prev) => ({
       ...prev,
@@ -72,5 +81,5 @@ export function useSignup() {
     }));
   };
 
-  return { handleChange, handleSubmit, myForm, error, loading };
+  return { handleChange, handleSubmit, myForm, loading, errors };
 }
