@@ -1,7 +1,8 @@
 import Toolbar from "./Toolbar";
 import FabricCanvas from "./FabricCanvas";
 import { useBoard } from "../hooks/useBoard";
-import { FaSearchMinus, FaSearchPlus } from "react-icons/fa";
+import { FaSearchMinus, FaSearchPlus, FaTimes } from "react-icons/fa";
+import { useState } from "react";
 
 const Board: React.FC = () => {
   const {
@@ -20,15 +21,24 @@ const Board: React.FC = () => {
     handleResetZoom,
   } = useBoard();
 
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleClear = () => {
+    clearCanvas();
+    setMenuOpen(false);
+  };
+
+  const handleSave = () => {
+    saveBoard();
+    setMenuOpen(false);
+  };
+
   return (
     <div className="board-container h-screen w-screen overflow-hidden relative">
       <Toolbar
         tool={tool}
         setTool={setTool}
-        brushWidth={brushWidth}
-        setBrushWidth={setBrushWidth}
-        onClear={clearCanvas}
-        onSave={saveBoard}
+        onMenuToggle={() => setMenuOpen(!menuOpen)}
       />
 
       <FabricCanvas
@@ -37,6 +47,105 @@ const Board: React.FC = () => {
         brushWidth={brushWidth}
         tool={tool}
       />
+
+      {/* Hamburger Menu Sidebar */}
+      <div
+        className={`fixed top-0 left-0 h-full w-80 bg-white bg-opacity-95 backdrop-blur-sm shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
+          menuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Menu header */}
+        <div className="flex items-center justify-between p-4 border-b bg-gray-100 bg-opacity-90">
+          <h2 className="text-lg font-semibold text-gray-800">Settings</h2>
+          <button
+            onClick={() => setMenuOpen(false)}
+            className="p-2 hover:bg-gray-200 rounded transition-colors"
+            title="Close"
+          >
+            <FaTimes className="text-gray-700 text-xl" />
+          </button>
+        </div>
+
+        {/* Menu Content */}
+        <div className="p-6 space-y-6">
+          {/* Brush Width Control */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Brush Width
+            </label>
+            <div className="flex items-center space-x-3">
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={brushWidth}
+                onChange={(e) => setBrushWidth(Number(e.target.value))}
+                className="flex-1"
+              />
+              <span className="text-sm font-semibold text-gray-700 w-12 text-right">
+                {brushWidth}px
+              </span>
+            </div>
+
+            {/* Visual Preview */}
+            <div className="flex items-center justify-center p-4 bg-gray-50 rounded">
+              <div
+                className="bg-gray-800 rounded-full"
+                style={{
+                  width: `${brushWidth * 2}px`,
+                  height: `${brushWidth * 2}px`,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200"></div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            <button
+              onClick={handleClear}
+              className="w-full px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center justify-center space-x-2"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+              <span>Clear Canvas</span>
+            </button>
+
+            <button
+              onClick={handleSave}
+              className="w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium flex items-center justify-center space-x-2"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                />
+              </svg>
+              <span>Save Now</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Zoom Controls - Bottom Left */}
       <div className="fixed bottom-4 left-4 z-50 flex items-center space-x-2 bg-white border-2 border-gray-300 rounded-lg shadow-lg p-2">

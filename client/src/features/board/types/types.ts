@@ -47,8 +47,5 @@ export interface FabricCanvasProps {
 export interface ToolbarProps {
   tool: Tool;
   setTool: (tool: Tool) => void;
-  brushWidth: number;
-  setBrushWidth: (width: number) => void;
-  onClear: () => void;
-  onSave?: () => void; // Manual save
+  onMenuToggle: () => void;
 }
