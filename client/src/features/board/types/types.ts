@@ -48,3 +48,5 @@ export interface ToolbarProps {
   tool: Tool;
   setTool: (tool: Tool) => void;
 }
+
+export type DockPosition = "top" | "right" | "bottom" | "left";
