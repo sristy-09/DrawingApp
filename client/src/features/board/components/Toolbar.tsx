@@ -35,11 +35,9 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool }) => {
       {/* Draggable Tools Panel */}
       <div
         ref={toolbarRef}
-        onMouseDown={handleDragStart}
-        onTouchStart={handleDragStart}
         style={getToolbarStyle()}
         className={`z-40 bg-white border-2 border-gray-300 rounded-xl shadow-lg p-3 ${
-          isDragging ? "opacity-80 cursor-grabbing" : "cursor-grab"
+          isDragging ? "opacity-80 " : ""
         }`}
       >
         <div
@@ -47,6 +45,16 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool }) => {
             isVertical ? "flex-col" : "flex-row"
           } items-center gap-2`}
         >
+          {/* Drag Handle - ONLY drag from here */}
+          <div
+            onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
+            className="p-2 hover:bg-gray-100 rounded transition-colors cursor-grab active:cursor-grabbing"
+            title="Drag to reposition"
+          >
+            <FaGripVertical className="text-gray-400" />
+          </div>
+
           {/* Tool Buttons */}
           {Object.keys(toolIcons).map((key) => {
             const typedKey = key as Tool;
