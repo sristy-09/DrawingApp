@@ -22,6 +22,7 @@ function UserDashboard() {
     createBoard,
     handleLogout,
     setTheme,
+    handleBoardDeleted,
   } = useUserDashboard();
 
   useEffect(() => {
@@ -132,7 +133,12 @@ function UserDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {boards.map((board) => (
-            <BoardList key={board._id} board={board} /> // <- pass single board
+            <BoardList
+              key={board._id}
+              board={board}
+              currentUserId={user._id}
+              onBoardDeleted={handleBoardDeleted}
+            /> // <- pass single board
           ))}
         </div>
       </div>
