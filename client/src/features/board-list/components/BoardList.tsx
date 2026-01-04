@@ -30,6 +30,7 @@ const BoardList: React.FC<BoardListProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
 
   const isOwner = board.owner?._id === currentUserId;
+  console.log(isOwner);
 
   // Access and format updatedAt
   const updateDate = new Date(board.updatedAt);
@@ -108,7 +109,7 @@ const BoardList: React.FC<BoardListProps> = ({
             className="w-60 h-30 object-cover border-2"
           />
         ) : (
-          <div className="bg-amber-200 h-30 w-60" />
+          <div className="bg-white h-30 w-60" />
         )}
       </CardContent>
 

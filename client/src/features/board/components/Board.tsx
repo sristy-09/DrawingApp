@@ -3,6 +3,7 @@ import FabricCanvas from "./FabricCanvas";
 import { useBoard } from "../hooks/useBoard";
 import { FaBars, FaSearchMinus, FaSearchPlus, FaTimes } from "react-icons/fa";
 import { useState } from "react";
+import type { Tool } from "../types/types";
 
 const Board: React.FC = () => {
   const {
@@ -33,6 +34,10 @@ const Board: React.FC = () => {
     setMenuOpen(false);
   };
 
+  const handleToolChange = (newTool: Tool) => {
+    setTool(newTool);
+  };
+
   return (
     <div className="board-container h-screen w-screen overflow-hidden relative">
       <Toolbar tool={tool} setTool={setTool} />
@@ -42,6 +47,7 @@ const Board: React.FC = () => {
         color={color}
         brushWidth={brushWidth}
         tool={tool}
+        onToolChange={handleToolChange}
       />
 
       {/* Hamburger Menu Button - Top Left Corner */}

@@ -9,7 +9,7 @@ import React, {
 
 // 1. Type for the User object
 export interface User {
-  id: string;
+  _id: string;
   email: string;
   username?: string;
   avatar?: string;

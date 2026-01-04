@@ -42,6 +42,7 @@ export interface FabricCanvasProps {
   brushWidth: number;
   tool: Tool;
   loadJson?: string;
+  onToolChange?: (tool: Tool) => void;
 }
 
 export interface ToolbarProps {
