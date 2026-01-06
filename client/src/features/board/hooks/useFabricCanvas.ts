@@ -19,6 +19,23 @@ export function useFabricCanvas({
   const lastPosXRef = useRef<number>(0);
   const lastPosYRef = useRef<number>(0);
 
+  const activeToolHandlersRef = useRef<{
+    down?: any;
+    move?: any;
+    up?: any;
+    extra?: any;
+  }>({});
+
+  function cleanupToolHandlers(canvas: fabric.Canvas) {
+    const h = activeToolHandlersRef.current;
+
+    if (h.down) canvas.off("mouse:down", h.down);
+    if (h.move) canvas.off("mouse:move", h.move);
+    if (h.up) canvas.off("mouse:up", h.up);
+    if (h.extra) canvas.off("path:created", h.extra);
+    activeToolHandlersRef.current = {};
+  }
+
   // -----------------------------
   // ZOOM FUNCTIONS
   // -----------------------------
@@ -125,12 +142,33 @@ export function useFabricCanvas({
       const canvas = canvasInstance.current;
       if (!canvas) return;
 
+      /* ----------------------------------
+       CLEANUP PREVIOUS TOOL
+      ---------------------------------- */
+      cleanupToolHandlers(canvas);
+
+      // Restore any faded objects(eraser safety)
+      canvas.forEachObject((obj) => {
+        if (obj.opacity !== 1) {
+          obj.set({ opacity: 1 });
+        }
+      });
+
+      // Clear top context (eraser cursor)
+      canvas.contextTop?.clearRect(0, 0, canvas.width!, canvas.height!);
+
       // Reset panning
       isPanningRef.current = false;
 
+      /* ----------------------------------
+       BASE CANVAS STATE
+      ---------------------------------- */
       canvas.isDrawingMode = _tool === "brush";
       canvas.selection = _tool === "select";
 
+      /* ----------------------------------
+       CURSORS
+      ---------------------------------- */
       // Set cursor based on tool - FIXED: Always show crosshair for drawing tools
       if (_tool === "pan") {
         canvas.defaultCursor = "grab";
@@ -175,144 +213,157 @@ export function useFabricCanvas({
 
       canvas.renderAll();
 
-      // Remove previous listeners
-      canvas.off("mouse:down");
-      canvas.off("mouse:move");
-      canvas.off("mouse:up");
-      canvas.off("path:created");
-
+      /* ----------------------------------
+       BRUSH TOOL
+      ---------------------------------- */
       // Handle brush drawing
       if (_tool === "brush") {
-        canvas.on("path:created", (e) => {
+        const onPathCreated = (e: any) => {
           if (!e.path) return;
 
           e.path.set({
             strokeUniform: true, // it tells fabric "Do NOT scale the stroke based on viewport zoom"
             objectCaching: false,
+            selectable: true,
+            evented: false,
           });
 
           e.path.setCoords();
           canvas.requestRenderAll();
-        });
+        };
+
+        canvas.on("path:created", onPathCreated);
+        activeToolHandlersRef.current.extra = onPathCreated;
       }
 
+      /* ----------------------------------
+       ERASER TOOL
+      ---------------------------------- */
       // Handle eraser - drag to select and preview deletion
       if (_tool === "eraser") {
         let isErasing = false;
         let eraserCircle: fabric.Circle | null = null;
-        let touchedObjects: Set<fabric.Object> = new Set();
+        let touchedObjects = new Set<fabric.Object>();
         const eraserRadius = _width * 3; // Eraser size
+
+        // Draw erasor cursor(TEMP only)
+        const drawEraserCursor = (x: number, y: number) => {
+          const ctx = canvas.contextTop;
+          if (!ctx) return;
+
+          ctx.clearRect(0, 0, canvas.width!, canvas.height!);
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(x, y, eraserRadius, 0, Math.PI * 2);
+          ctx.strokeStyle = "#999";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 5]);
+          ctx.stroke();
+          ctx.restore();
+        };
 
         const checkObjectIntersection = (
           obj: fabric.Object,
-          cursorX: number,
-          cursorY: number
+          x: number,
+          y: number,
+          eraserRadius: number
         ): boolean => {
           if (obj === eraserCircle) return false;
 
-          const objBounds = obj.getBoundingRect();
-          const distance = Math.sqrt(
-            Math.pow(cursorX - (objBounds.left + objBounds.width / 2), 2) +
-              Math.pow(cursorY - (objBounds.top + objBounds.height / 2), 2)
+          const rect = obj.getBoundingRect(); // absolute coords
+          // This calculates: Distance between eraser center and object center
+          const closestX = Math.max(
+            rect.left,
+            Math.min(x, rect.left + rect.width)
           );
 
-          // Check if cursor circle intersects with object
-          return (
-            distance <
-            eraserRadius + Math.max(objBounds.width, objBounds.height) / 2
+          const closestY = Math.max(
+            rect.top,
+            Math.min(y, rect.top + rect.height)
           );
+
+          const dx = x - closestX;
+          const dy = y - closestY;
+
+          return dx * dx + dy * dy <= eraserRadius * eraserRadius;
         };
 
-        canvas.on(
-          "mouse:down",
-          (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
-            isErasing = true;
-            touchedObjects.clear();
-            const pointer = canvas.getPointer(e.e);
+        const onDown = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+          isErasing = true;
+          touchedObjects.clear();
+          const pointer = canvas.getPointer(e.e);
 
-            // Create eraser circle cursor
-            eraserCircle = new fabric.Circle({
-              left: pointer.x,
-              top: pointer.y,
-              radius: eraserRadius,
-              fill: "transparent",
-              stroke: "#999999",
-              strokeWidth: 2,
-              strokeDasharray: [5, 5],
-              selectable: false,
-              evented: false,
-              opacity: 0.6,
-              originX: "center",
-              originY: "center",
-            });
-            canvas.add(eraserCircle);
-          }
-        );
+          // Create eraser circle cursor
+          drawEraserCursor(pointer.x, pointer.y);
+        };
 
-        canvas.on(
-          "mouse:move",
-          (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
-            if (!isErasing || !eraserCircle) return;
+        const onMove = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+          if (!isErasing) return;
 
-            const pointer = canvas.getPointer(e.e);
+          const pointer = canvas.getPointer(e.e);
+          drawEraserCursor(pointer.x, pointer.y);
 
-            // Move eraser circle with cursor
-            eraserCircle.set({
-              left: pointer.x,
-              top: pointer.y,
-            });
+          // Check intersection with all objects
+          canvas.forEachObject((obj) => {
+            const isIntersecting = checkObjectIntersection(
+              obj,
+              pointer.x,
+              pointer.y,
+              eraserRadius
+            );
 
-            // Check intersection with all objects
-            canvas.forEachObject((obj) => {
-              if (obj === eraserCircle) return;
-
-              const isIntersecting = checkObjectIntersection(
-                obj,
-                pointer.x,
-                pointer.y
-              );
-
-              if (isIntersecting) {
-                if (!touchedObjects.has(obj)) {
-                  touchedObjects.add(obj);
-                  obj.set({ opacity: 0.3 }); // Preview deletion
-                }
-              } else {
-                if (touchedObjects.has(obj)) {
-                  obj.set({ opacity: 1 }); // Restore opacity
-                  touchedObjects.delete(obj);
-                }
+            if (isIntersecting) {
+              if (!touchedObjects.has(obj)) {
+                touchedObjects.add(obj);
+                obj.set({ opacity: 0.3 }); // Preview deletion
               }
-            });
+            } else if (touchedObjects.has(obj)) {
+              obj.set({ opacity: 1 }); // Restore opacity
+              touchedObjects.delete(obj);
+            }
+          });
 
-            canvas.renderAll();
-          }
-        );
+          canvas.requestRenderAll();
+        };
 
-        canvas.on("mouse:up", () => {
+        const onUp = () => {
           if (!isErasing) return;
 
           isErasing = false;
 
-          // Remove the eraser circle
-          if (eraserCircle) {
-            canvas.remove(eraserCircle);
-            eraserCircle = null;
-          }
+          // Clear temporary cursor
+          const ctx = canvas.contextTop;
+          ctx?.clearRect(0, 0, canvas.width!, canvas.height!);
 
           // Delete all touched objects
           touchedObjects.forEach((obj) => {
+            obj.set({ opacity: 1 }); // safety
             canvas.remove(obj);
           });
+
           touchedObjects.clear();
 
-          canvas.renderAll();
-        });
+          canvas.requestRenderAll();
+        };
+
+        canvas.on("mouse:down", onDown);
+        canvas.on("mouse:move", onMove);
+        canvas.on("mouse:up", onUp);
+
+        activeToolHandlersRef.current = {
+          down: onDown,
+          move: onMove,
+          up: onUp,
+        };
       }
 
+      /* ----------------------------------
+       PAN TOOL
+      ---------------------------------- */
       // Handle pan tool
       if (_tool === "pan") {
-        canvas.on("mouse:down", (e) => {
+        const onDown = (e: any) => {
           const evt = e.e as MouseEvent | PointerEvent;
           if (evt.altKey || _tool === "pan") {
             isPanningRef.current = true;
@@ -321,9 +372,9 @@ export function useFabricCanvas({
             lastPosXRef.current = evt.clientX;
             lastPosYRef.current = evt.clientY;
           }
-        });
+        };
 
-        canvas.on("mouse:move", (e) => {
+        const onMove = (e: any) => {
           const evt = e.e as MouseEvent | PointerEvent;
           if (isPanningRef.current && canvas.viewportTransform) {
             const vpt = canvas.viewportTransform;
@@ -333,12 +384,22 @@ export function useFabricCanvas({
             lastPosXRef.current = evt.clientX;
             lastPosYRef.current = evt.clientY;
           }
-        });
+        };
 
-        canvas.on("mouse:up", () => {
+        const onUp = () => {
           isPanningRef.current = false;
           canvas.defaultCursor = "grab";
-        });
+        };
+
+        canvas.on("mouse:down", onDown);
+        canvas.on("mouse:move", onMove);
+        canvas.on("mouse:up", onUp);
+
+        activeToolHandlersRef.current = {
+          down: onDown,
+          move: onMove,
+          up: onUp,
+        };
       }
 
       // Handle shape drawing tools
@@ -453,6 +514,12 @@ export function useFabricCanvas({
         canvas.on("mouse:down", onDown);
         canvas.on("mouse:move", onMove);
         canvas.on("mouse:up", onUp);
+
+        activeToolHandlersRef.current = {
+          down: onDown,
+          move: onMove,
+          up: onUp,
+        };
       }
     },
     [onToolChange]
