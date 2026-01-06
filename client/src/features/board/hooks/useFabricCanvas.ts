@@ -246,47 +246,24 @@ export function useFabricCanvas({
         let touchedObjects = new Set<fabric.Object>();
         const eraserRadius = _width * 3; // Eraser size
 
-        // Draw erasor cursor(TEMP only)
-        const drawEraserCursor = (x: number, y: number) => {
-          const ctx = canvas.contextTop;
-          if (!ctx) return;
-
-          ctx.clearRect(0, 0, canvas.width!, canvas.height!);
-
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(x, y, eraserRadius, 0, Math.PI * 2);
-          ctx.strokeStyle = "#999";
-          ctx.lineWidth = 2;
-          ctx.setLineDash([5, 5]);
-          ctx.stroke();
-          ctx.restore();
-        };
-
         const checkObjectIntersection = (
           obj: fabric.Object,
-          x: number,
-          y: number,
-          eraserRadius: number
+          cursorX: number,
+          cursorY: number
         ): boolean => {
           if (obj === eraserCircle) return false;
 
-          const rect = obj.getBoundingRect(); // absolute coords
-          // This calculates: Distance between eraser center and object center
-          const closestX = Math.max(
-            rect.left,
-            Math.min(x, rect.left + rect.width)
+          const objBounds = obj.getBoundingRect();
+          const distance = Math.sqrt(
+            Math.pow(cursorX - (objBounds.left + objBounds.width / 2), 2) +
+              Math.pow(cursorY - (objBounds.top + objBounds.height / 2), 2)
           );
 
-          const closestY = Math.max(
-            rect.top,
-            Math.min(y, rect.top + rect.height)
+          // Check if cursor circle intersects with object
+          return (
+            distance <
+            eraserRadius + Math.max(objBounds.width, objBounds.height) / 2
           );
-
-          const dx = x - closestX;
-          const dy = y - closestY;
-
-          return dx * dx + dy * dy <= eraserRadius * eraserRadius;
         };
 
         const onDown = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
@@ -295,22 +272,43 @@ export function useFabricCanvas({
           const pointer = canvas.getPointer(e.e);
 
           // Create eraser circle cursor
-          drawEraserCursor(pointer.x, pointer.y);
+          eraserCircle = new fabric.Circle({
+            left: pointer.x,
+            top: pointer.y,
+            radius: eraserRadius,
+            fill: "transparent",
+            stroke: "#999999",
+            strokeWidth: 2,
+            strokeDasharray: [5, 5],
+            selectable: false,
+            evented: false,
+            excludeFromExport: true,
+            objectCaching: false,
+            opacity: 0.6,
+            originX: "center",
+            originY: "center",
+          });
+          canvas.add(eraserCircle);
         };
-
         const onMove = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
-          if (!isErasing) return;
+          if (!isErasing || !eraserCircle) return;
 
           const pointer = canvas.getPointer(e.e);
-          drawEraserCursor(pointer.x, pointer.y);
+
+          // Move eraser circle with cursor
+          eraserCircle.set({
+            left: pointer.x,
+            top: pointer.y,
+          });
 
           // Check intersection with all objects
           canvas.forEachObject((obj) => {
+            if (obj === eraserCircle) return;
+
             const isIntersecting = checkObjectIntersection(
               obj,
               pointer.x,
-              pointer.y,
-              eraserRadius
+              pointer.y
             );
 
             if (isIntersecting) {
@@ -318,13 +316,15 @@ export function useFabricCanvas({
                 touchedObjects.add(obj);
                 obj.set({ opacity: 0.3 }); // Preview deletion
               }
-            } else if (touchedObjects.has(obj)) {
-              obj.set({ opacity: 1 }); // Restore opacity
-              touchedObjects.delete(obj);
+            } else {
+              if (touchedObjects.has(obj)) {
+                obj.set({ opacity: 1 }); // Restore opacity
+                touchedObjects.delete(obj);
+              }
             }
           });
 
-          canvas.requestRenderAll();
+          canvas.renderAll();
         };
 
         const onUp = () => {
@@ -332,18 +332,20 @@ export function useFabricCanvas({
 
           isErasing = false;
 
-          // Clear temporary cursor
-          const ctx = canvas.contextTop;
-          ctx?.clearRect(0, 0, canvas.width!, canvas.height!);
-
           // Delete all touched objects
           touchedObjects.forEach((obj) => {
-            obj.set({ opacity: 1 }); // safety
+            obj.set({ opacity: 1 });
             canvas.remove(obj);
           });
-
           touchedObjects.clear();
 
+          // Remove the eraser circle
+          if (eraserCircle) {
+            canvas.remove(eraserCircle);
+            eraserCircle = null;
+          }
+
+          canvas.discardActiveObject();
           canvas.requestRenderAll();
         };
 
@@ -498,12 +500,15 @@ export function useFabricCanvas({
             shape.setCoords();
 
             // Set the newly created shape as active object to show selection
+            canvas.discardActiveObject();
             canvas.setActiveObject(shape);
             canvas.renderAll();
 
             // Auto-switch to select tool after drawing shape
             if (onToolChange) {
-              onToolChange("select");
+              setTimeout(() => {
+                onToolChange("select");
+              }, 0);
             }
           }
           isDrawing = false;
