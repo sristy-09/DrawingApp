@@ -17,16 +17,24 @@ export function useBoard() {
   const [zoom, setZoom] = useState<number>(1);
 
   const lastSavedDataRef = useRef<string>("");
+  const isDrawingRef = useRef<boolean>(false); // Track if user is actively drawing
+  const isSavingRef = useRef<boolean>(false); // Track if save is in progress
 
   const clearCanvas = () => canvasRef.current?.clear();
 
-  // FIXED: Better thumbnail generation without html2canvas
-  const generateFullPageThumbnail = async (): Promise<string> => {
+  // Simple thumbnail generation without toolbar
+  const generateThumbnail = async (): Promise<string> => {
     console.log("🎨 Starting thumbnail generation...");
 
     const canvas = canvasRef.current?.getCanvas();
     if (!canvas) {
       console.error("❌ Canvas not found");
+      return "";
+    }
+
+    // Don't generate thumbnail while user is drawing
+    if (isDrawingRef.current) {
+      console.log("⏭️ Skipping thumbnail - user is drawing");
       return "";
     }
 
@@ -36,7 +44,6 @@ export function useBoard() {
       const currentVPT: TMat2D = canvas.viewportTransform
         ? ([...canvas.viewportTransform] as TMat2D)
         : [1, 0, 0, 1, 0, 0];
-      console.log("📊 Current zoom:", currentZoom);
 
       // Reset for thumbnail
       canvas.setZoom(1);
@@ -44,72 +51,23 @@ export function useBoard() {
       canvas.renderAll();
 
       // Wait for render
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Create thumbnail with toolbar simulation
-      const thumbCanvas = document.createElement("canvas");
-      thumbCanvas.width = 400;
-      thumbCanvas.height = 300;
-      const ctx = thumbCanvas.getContext("2d");
-
-      if (!ctx) {
-        console.error("❌ Could not get context");
-        return "";
-      }
-
-      // Draw white background
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(0, 0, 400, 300);
-
-      // Draw toolbar
-      ctx.fillStyle = "#F3F4F6";
-      ctx.fillRect(0, 0, 400, 50);
-      ctx.fillStyle = "#1F2937";
-      ctx.font = "bold 16px Arial";
-      ctx.fillText("Drawing Board", 15, 30);
-
-      // Get canvas image
-      const canvasDataURL = canvas.toDataURL({
-        multiplier: 1,
+      // Generate thumbnail directly from canvas
+      const thumbnail = canvas.toDataURL({
         format: "png",
         quality: 0.8,
+        multiplier: Math.min(400 / canvas.getWidth(), 300 / canvas.getHeight()),
       });
-      console.log(
-        "📸 Canvas data URL generated, length:",
-        canvasDataURL.length
-      );
 
-      // Load and draw canvas image
-      const img = new Image();
-      const result = await new Promise<string>((resolve) => {
-        img.onload = () => {
-          const scale = Math.min(
-            400 / canvas.getWidth(),
-            250 / canvas.getHeight()
-          );
-          const w = canvas.getWidth() * scale;
-          const h = canvas.getHeight() * scale;
-          const x = (400 - w) / 2;
-          const y = 50 + (250 - h) / 2;
-
-          ctx.drawImage(img, x, y, w, h);
-          const thumbnail = thumbCanvas.toDataURL("image/png", 0.8);
-          console.log("✅ Thumbnail created, length:", thumbnail.length);
-          resolve(thumbnail);
-        };
-        img.onerror = () => {
-          console.error("❌ Image load failed");
-          resolve("");
-        };
-        img.src = canvasDataURL;
-      });
+      console.log("✅ Thumbnail created, length:", thumbnail.length);
 
       // Restore state
       canvas.setZoom(currentZoom);
       if (currentVPT) canvas.viewportTransform = currentVPT;
       canvas.renderAll();
 
-      return result;
+      return thumbnail;
     } catch (error) {
       console.error("❌ Thumbnail error:", error);
       return "";
@@ -117,7 +75,13 @@ export function useBoard() {
   };
 
   const saveBoard = async (includeThumbnail = false) => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || isSavingRef.current) return;
+
+    // Don't save while user is actively drawing
+    if (isDrawingRef.current) {
+      console.log("⏭️ Skipping save - user is drawing");
+      return;
+    }
 
     const json = canvasRef.current.saveToJson();
 
@@ -133,6 +97,7 @@ export function useBoard() {
         : "💾 Saving without thumbnail..."
     );
 
+    isSavingRef.current = true;
     setSaveStatus("saving");
 
     try {
@@ -142,7 +107,7 @@ export function useBoard() {
 
       // Add thumbnail if requested
       if (includeThumbnail) {
-        const thumbnail = await generateFullPageThumbnail();
+        const thumbnail = await generateThumbnail();
 
         if (thumbnail) {
           payload.thumbnail = thumbnail;
@@ -162,35 +127,37 @@ export function useBoard() {
 
       setTimeout(() => setSaveStatus("idle"), 2000);
 
-      console.log("Saved:", res.data);
+      console.log("✅ Saved successfully");
     } catch (error) {
-      console.error("Error saving board:", error);
+      console.error("❌ Error saving board:", error);
       setSaveStatus("idle");
+    } finally {
+      isSavingRef.current = false;
     }
   };
 
   // Track if canvas has actually changed
   const hasChangedRef = useRef(false);
 
-  // Create debounced save function using lodash
+  // Create debounced save function - only save when not drawing
   const debouncedSave = useCallback(
     debounce(() => {
-      if (hasChangedRef.current) {
+      if (hasChangedRef.current && !isDrawingRef.current) {
         saveBoard(false);
       }
     }, 2000),
     [id]
   );
 
-  // Debounced thumbnail generation (5 seconds)
+  // Debounced thumbnail generation (5 seconds) - only when not drawing
   const debouncedThumbnailSave = useCallback(
     debounce(() => {
-      if (hasChangedRef.current) {
+      if (hasChangedRef.current && !isDrawingRef.current) {
         console.log("⏰ 5 seconds elapsed - saving with thumbnail");
-        saveBoard(true); // Save with thumbnail
-        hasChangedRef.current = false; // Reset after thumbnail save
+        saveBoard(true);
+        hasChangedRef.current = false;
       } else {
-        console.log("⏭️ No changes detected - skipping thumbnail generation");
+        console.log("⏭️ No changes or user drawing - skipping thumbnail");
       }
     }, 5000),
     [id]
@@ -198,7 +165,7 @@ export function useBoard() {
 
   const handleCanvasChange = () => {
     console.log("🎨 Canvas changed");
-    hasChangedRef.current = true; // Mark that changes have been made
+    hasChangedRef.current = true;
     debouncedSave();
     debouncedThumbnailSave();
   };
@@ -224,11 +191,32 @@ export function useBoard() {
     loadBoard();
   }, [id]);
 
-  // Debounced Auto-save with lodash
+  // Track drawing state to prevent saves during drawing
   useEffect(() => {
     const canvas = canvasRef.current?.getCanvas();
     if (!canvas) return;
 
+    const handleMouseDown = () => {
+      isDrawingRef.current = true;
+      console.log("🖊️ Drawing started");
+    };
+
+    const handleMouseUp = () => {
+      isDrawingRef.current = false;
+      console.log("🖊️ Drawing ended");
+
+      // Trigger save after drawing completes
+      if (hasChangedRef.current) {
+        debouncedSave();
+        debouncedThumbnailSave();
+      }
+    };
+
+    // Track drawing state
+    canvas.on("mouse:down", handleMouseDown);
+    canvas.on("mouse:up", handleMouseUp);
+
+    // Track canvas changes
     canvas.on("object:modified", handleCanvasChange);
     canvas.on("object:added", handleCanvasChange);
     canvas.on("path:created", handleCanvasChange);
@@ -237,6 +225,8 @@ export function useBoard() {
     return () => {
       debouncedSave.cancel();
       debouncedThumbnailSave.cancel();
+      canvas.off("mouse:down", handleMouseDown);
+      canvas.off("mouse:up", handleMouseUp);
       canvas.off("object:modified", handleCanvasChange);
       canvas.off("object:added", handleCanvasChange);
       canvas.off("path:created", handleCanvasChange);

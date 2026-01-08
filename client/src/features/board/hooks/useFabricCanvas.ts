@@ -26,6 +26,12 @@ export function useFabricCanvas({
     extra?: any;
   }>({});
 
+  // Track current shape being drawn and eraser state
+  const currentShapeRef = useRef<fabric.Object | null>(null);
+  const isDrawingShapeRef = useRef<boolean>(false);
+  const eraserCircleRef = useRef<fabric.Circle | null>(null);
+  const isErasingRef = useRef<boolean>(false);
+
   function cleanupToolHandlers(canvas: fabric.Canvas) {
     const h = activeToolHandlersRef.current;
 
@@ -34,6 +40,20 @@ export function useFabricCanvas({
     if (h.up) canvas.off("mouse:up", h.up);
     if (h.extra) canvas.off("path:created", h.extra);
     activeToolHandlersRef.current = {};
+
+    // Clean up any leftover shape
+    if (currentShapeRef.current) {
+      canvas.remove(currentShapeRef.current);
+      currentShapeRef.current = null;
+    }
+    isDrawingShapeRef.current = false;
+
+    // Cleanup any leftover eraser circle
+    if (eraserCircleRef.current) {
+      canvas.remove(eraserCircleRef.current);
+      eraserCircleRef.current = null;
+    }
+    isErasingRef.current = false;
   }
 
   // -----------------------------
@@ -52,7 +72,7 @@ export function useFabricCanvas({
     }
 
     canvas.renderAll();
-  }, []);
+  }, [brushWidth]);
 
   const zoomOut = useCallback(() => {
     const canvas = canvasInstance.current;
@@ -67,7 +87,7 @@ export function useFabricCanvas({
     }
 
     canvas.renderAll();
-  }, []);
+  }, [brushWidth]);
 
   const resetZoom = useCallback(() => {
     const canvas = canvasInstance.current;
@@ -81,7 +101,7 @@ export function useFabricCanvas({
     }
 
     canvas.renderAll();
-  }, []);
+  }, [brushWidth]);
 
   const getZoom = useCallback(() => {
     const canvas = canvasInstance.current;
@@ -241,8 +261,6 @@ export function useFabricCanvas({
       ---------------------------------- */
       // Handle eraser - drag to select and preview deletion
       if (_tool === "eraser") {
-        let isErasing = false;
-        let eraserCircle: fabric.Circle | null = null;
         let touchedObjects = new Set<fabric.Object>();
         const eraserRadius = _width * 3; // Eraser size
 
@@ -251,7 +269,10 @@ export function useFabricCanvas({
           cursorX: number,
           cursorY: number
         ): boolean => {
-          if (obj === eraserCircle) return false;
+          if (obj === eraserCircleRef.current) return false;
+
+          // Ignore objects marked as excludeFromExport (temp objects)
+          if ((obj as any).excludeFromExport) return false;
 
           const objBounds = obj.getBoundingRect();
           const distance = Math.sqrt(
@@ -267,12 +288,12 @@ export function useFabricCanvas({
         };
 
         const onDown = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
-          isErasing = true;
+          isErasingRef.current = true;
           touchedObjects.clear();
           const pointer = canvas.getPointer(e.e);
 
           // Create eraser circle cursor
-          eraserCircle = new fabric.Circle({
+          eraserCircleRef.current = new fabric.Circle({
             left: pointer.x,
             top: pointer.y,
             radius: eraserRadius,
@@ -288,22 +309,25 @@ export function useFabricCanvas({
             originX: "center",
             originY: "center",
           });
-          canvas.add(eraserCircle);
+          canvas.add(eraserCircleRef.current);
+          canvas.renderAll();
         };
+
         const onMove = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
-          if (!isErasing || !eraserCircle) return;
+          if (!isErasingRef.current || !eraserCircleRef.current) return;
 
           const pointer = canvas.getPointer(e.e);
 
           // Move eraser circle with cursor
-          eraserCircle.set({
+          eraserCircleRef.current.set({
             left: pointer.x,
             top: pointer.y,
           });
 
           // Check intersection with all objects
           canvas.forEachObject((obj) => {
-            if (obj === eraserCircle) return;
+            if (obj === eraserCircleRef.current) return;
+            if ((obj as any).excludeFromExport) return;
 
             const isIntersecting = checkObjectIntersection(
               obj,
@@ -328,9 +352,9 @@ export function useFabricCanvas({
         };
 
         const onUp = () => {
-          if (!isErasing) return;
+          if (!isErasingRef.current) return;
 
-          isErasing = false;
+          isErasingRef.current = false;
 
           // Delete all touched objects
           touchedObjects.forEach((obj) => {
@@ -340,9 +364,9 @@ export function useFabricCanvas({
           touchedObjects.clear();
 
           // Remove the eraser circle
-          if (eraserCircle) {
-            canvas.remove(eraserCircle);
-            eraserCircle = null;
+          if (eraserCircleRef.current) {
+            canvas.remove(eraserCircleRef.current);
+            eraserCircleRef.current = null;
           }
 
           canvas.discardActiveObject();
@@ -404,6 +428,9 @@ export function useFabricCanvas({
         };
       }
 
+      /* ----------------------------------
+       SHAPE TOOLS
+      ---------------------------------- */
       // Handle shape drawing tools
       if (
         _tool !== "brush" &&
@@ -411,19 +438,14 @@ export function useFabricCanvas({
         _tool !== "select" &&
         _tool !== "pan"
       ) {
-        let shape: fabric.Object | null = null;
-        let isDrawing = false;
-        let startX = 0;
-        let startY = 0;
-
         const onDown = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
           const canvas = canvasInstance.current;
           if (!canvas) return;
 
-          isDrawing = true;
+          isDrawingShapeRef.current = true;
           const pointer = canvas.getPointer(e.e);
-          startX = pointer.x;
-          startY = pointer.y;
+          const startX = pointer.x;
+          const startY = pointer.y;
 
           const opts = {
             left: startX,
@@ -438,6 +460,8 @@ export function useFabricCanvas({
             hasBorders: true,
           };
 
+          let shape: fabric.Object | null = null;
+
           switch (_tool) {
             case "rect":
               shape = new fabric.Rect({ ...opts, width: 0, height: 0 });
@@ -451,19 +475,25 @@ export function useFabricCanvas({
           }
 
           if (shape) {
+            currentShapeRef.current = shape;
+            (shape as any)._startX = startX;
+            (shape as any)._startY = startY;
             canvas.add(shape);
             canvas.requestRenderAll();
           }
         };
 
         const onMove = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
-          if (!shape || !isDrawing) return;
+          if (!currentShapeRef.current || !isDrawingShapeRef.current) return;
           const canvas = canvasInstance.current;
           if (!canvas) return;
 
+          const shape = currentShapeRef.current;
           const pointer = canvas.getPointer(e.e);
           const x = pointer.x;
           const y = pointer.y;
+          const startX = (shape as any)._startX;
+          const startY = (shape as any)._startY;
 
           switch (_tool) {
             case "rect": {
@@ -490,7 +520,10 @@ export function useFabricCanvas({
         };
 
         const onUp = () => {
-          if (shape && isDrawing) {
+          if (currentShapeRef.current && isDrawingShapeRef.current) {
+            const shape = currentShapeRef.current;
+
+            // Make shape selectable and movable
             shape.set({
               selectable: true,
               evented: true,
@@ -511,8 +544,8 @@ export function useFabricCanvas({
               }, 0);
             }
           }
-          isDrawing = false;
-          shape = null;
+          isDrawingShapeRef.current = false;
+          currentShapeRef.current = null;
           canvas?.requestRenderAll();
         };
 
@@ -619,7 +652,18 @@ export function useFabricCanvas({
   const saveToJson = useCallback(() => {
     const canvas = canvasInstance.current;
     if (!canvas) return "";
-    return JSON.stringify(canvas.toJSON());
+
+    // Get canvas JSON and filter out temporary objects
+    const canvasJSON = canvas.toJSON();
+
+    // Filter out objects marked as excludeFromExport
+    if (canvasJSON.objects) {
+      canvasJSON.objects = canvasJSON.objects.filter(
+        (obj: any) => !obj.excludeFromExport
+      );
+    }
+
+    return JSON.stringify(canvasJSON);
   }, []);
 
   // Load canvas from JSON
