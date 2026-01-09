@@ -115,35 +115,45 @@ export function useFabricCanvas({
     const canvas = canvasInstance.current;
     if (!canvas) return "";
 
-    // Store current zoom and viewport
-    const currentZoom = canvas.getZoom();
-    const currentVPT = canvas.viewportTransform?.slice() as
-      | fabric.TMat2D
-      | undefined;
-
-    // Reset zoom and viewport for thumbnail
-    canvas.setZoom(1);
-    canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
-    canvas.renderAll();
-
-    // Generate thumbnail as data URL
-    const dataURL = canvas.toDataURL({
-      format: "png",
-      quality: 0.8,
-      multiplier: Math.min(
-        width / canvas.getWidth(),
-        height / canvas.getHeight()
-      ),
-    });
-
-    // Restore zoom and viewport
-    canvas.setZoom(currentZoom);
-    if (currentVPT) {
-      canvas.viewportTransform = currentVPT;
+    // Don't generate thumbnail while user is drawing
+    if (isDrawingShapeRef.current || isErasingRef.current) {
+      return "";
     }
-    canvas.renderAll();
 
-    return dataURL;
+    try {
+      // Store current zoom and viewport
+      const currentZoom = canvas.getZoom();
+      const currentVPT = canvas.viewportTransform?.slice() as
+        | fabric.TMat2D
+        | undefined;
+
+      // Reset zoom and viewport for thumbnail
+      canvas.setZoom(1);
+      canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+      canvas.renderAll();
+
+      // Generate thumbnail as data URL
+      const dataURL = canvas.toDataURL({
+        format: "png",
+        quality: 0.8,
+        multiplier: Math.min(
+          width / canvas.getWidth(),
+          height / canvas.getHeight()
+        ),
+      });
+
+      // Restore zoom and viewport
+      canvas.setZoom(currentZoom);
+      if (currentVPT) {
+        canvas.viewportTransform = currentVPT;
+      }
+      canvas.renderAll();
+
+      return dataURL;
+    } catch (error) {
+      console.error("❌ Thumbnail generation error:", error);
+      return "";
+    }
   }, []);
 
   // -----------------------------
@@ -636,6 +646,7 @@ export function useFabricCanvas({
     return () => {
       window.removeEventListener("resize", resize);
       fab.off("mouse:wheel");
+      cleanupToolHandlers(fab);
       fab.dispose();
       canvasInstance.current = null;
     };

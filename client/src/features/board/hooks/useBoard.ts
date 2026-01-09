@@ -3,7 +3,6 @@ import type { FabricCanvasRef, Tool } from "../types/types";
 import { useParams } from "react-router";
 import axios from "axios";
 import { debounce } from "lodash";
-import type { TMat2D } from "fabric";
 
 export function useBoard() {
   const { id } = useParams<{ id: string }>();
@@ -21,58 +20,6 @@ export function useBoard() {
   const isSavingRef = useRef<boolean>(false); // Track if save is in progress
 
   const clearCanvas = () => canvasRef.current?.clear();
-
-  // Simple thumbnail generation without toolbar
-  const generateThumbnail = async (): Promise<string> => {
-    console.log("🎨 Starting thumbnail generation...");
-
-    const canvas = canvasRef.current?.getCanvas();
-    if (!canvas) {
-      console.error("❌ Canvas not found");
-      return "";
-    }
-
-    // Don't generate thumbnail while user is drawing
-    if (isDrawingRef.current) {
-      console.log("⏭️ Skipping thumbnail - user is drawing");
-      return "";
-    }
-
-    try {
-      // Store current state
-      const currentZoom = canvas.getZoom();
-      const currentVPT: TMat2D = canvas.viewportTransform
-        ? ([...canvas.viewportTransform] as TMat2D)
-        : [1, 0, 0, 1, 0, 0];
-
-      // Reset for thumbnail
-      canvas.setZoom(1);
-      canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
-      canvas.renderAll();
-
-      // Wait for render
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // Generate thumbnail directly from canvas
-      const thumbnail = canvas.toDataURL({
-        format: "png",
-        quality: 0.8,
-        multiplier: Math.min(400 / canvas.getWidth(), 300 / canvas.getHeight()),
-      });
-
-      console.log("✅ Thumbnail created, length:", thumbnail.length);
-
-      // Restore state
-      canvas.setZoom(currentZoom);
-      if (currentVPT) canvas.viewportTransform = currentVPT;
-      canvas.renderAll();
-
-      return thumbnail;
-    } catch (error) {
-      console.error("❌ Thumbnail error:", error);
-      return "";
-    }
-  };
 
   const saveBoard = async (includeThumbnail = false) => {
     if (!canvasRef.current || isSavingRef.current) return;
@@ -106,8 +53,8 @@ export function useBoard() {
       };
 
       // Add thumbnail if requested
-      if (includeThumbnail) {
-        const thumbnail = await generateThumbnail();
+      if (includeThumbnail && !isDrawingRef.current) {
+        const thumbnail = canvasRef.current.getThumbnail?.(400, 300);
 
         if (thumbnail) {
           payload.thumbnail = thumbnail;
