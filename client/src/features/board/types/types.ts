@@ -35,6 +35,8 @@ export interface FabricCanvasRef {
   resetZoom: () => void;
   getZoom: () => number;
   getThumbnail: (width?: number, height?: number) => string;
+  undo: () => void;
+  redo: () => void;
 }
 
 export interface FabricCanvasProps {

@@ -19,6 +19,10 @@ export function useFabricCanvas({
   const lastPosXRef = useRef<number>(0);
   const lastPosYRef = useRef<number>(0);
 
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef<number>(-1);
+  const isUndoRedoRef = useRef<boolean>(false);
+
   const activeToolHandlersRef = useRef<{
     down?: any;
     move?: any;
@@ -107,6 +111,89 @@ export function useFabricCanvas({
     const canvas = canvasInstance.current;
     return canvas ? canvas.getZoom() : 1;
   }, []);
+
+  // -----------------------------
+  // UNDO AND REDO FUNCTIONS
+  // -----------------------------
+  const undo = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas || historyIndexRef.current <= 0) return;
+
+    isUndoRedoRef.current = true;
+    historyIndexRef.current--;
+
+    const state = historyRef.current[historyIndexRef.current];
+    canvas.loadFromJSON(state, () => {
+      canvas.renderAll();
+      isUndoRedoRef.current = false;
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas || historyIndexRef.current >= historyRef.current.length - 1)
+      return;
+
+    isUndoRedoRef.current = true;
+    historyIndexRef.current++;
+
+    const state = historyRef.current[historyIndexRef.current];
+    canvas.loadFromJSON(state, () => {
+      canvas.renderAll();
+      isUndoRedoRef.current = false;
+    });
+  }, []);
+
+  const saveHistory = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas || isUndoRedoRef.current) return;
+
+    const json = canvas.toJSON();
+    const state = JSON.stringify(json);
+
+    // Remove any redo states
+    historyRef.current = historyRef.current.slice(
+      0,
+      historyIndexRef.current + 1
+    );
+
+    // Add new state
+    historyRef.current.push(state);
+    historyIndexRef.current++;
+
+    // Limit history to 50 states
+    if (historyRef.current.length > 50) {
+      historyRef.current.shift();
+      historyIndexRef.current--;
+    }
+  }, []);
+
+  // Update the canvas event listeners to save history
+  useEffect(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    const handleHistoryEvent = () => {
+      if (!isUndoRedoRef.current) {
+        saveHistory();
+      }
+    };
+
+    canvas.on("object:added", handleHistoryEvent);
+    canvas.on("object:modified", handleHistoryEvent);
+    canvas.on("object:removed", handleHistoryEvent);
+    canvas.on("path:created", handleHistoryEvent);
+
+    // save initial state
+    saveHistory();
+
+    return () => {
+      canvas.off("object:added", handleHistoryEvent);
+      canvas.off("object:modified", handleHistoryEvent);
+      canvas.off("object:removed", handleHistoryEvent);
+      canvas.off("path:created", handleHistoryEvent);
+    };
+  }, [saveHistory]);
 
   // -----------------------------
   // THUMBNAIL GENERATION
@@ -700,5 +787,7 @@ export function useFabricCanvas({
     resetZoom,
     getZoom,
     getThumbnail,
+    undo,
+    redo,
   };
 }

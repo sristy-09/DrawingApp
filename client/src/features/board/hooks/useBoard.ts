@@ -208,6 +208,9 @@ export function useBoard() {
   const handleZoomOut = () => canvasRef.current?.zoomOut();
   const handleResetZoom = () => canvasRef.current?.resetZoom();
 
+  const handleUndo = () => canvasRef.current?.undo();
+  const handleRedo = () => canvasRef.current?.redo();
+
   return {
     canvasRef,
     color,
@@ -223,5 +226,7 @@ export function useBoard() {
     handleZoomIn,
     handleZoomOut,
     handleResetZoom,
+    handleUndo,
+    handleRedo,
   };
 }
