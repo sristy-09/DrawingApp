@@ -121,3 +121,38 @@ export const updateBoard = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+// Delete board (only owner can delete)
+export const deleteBoard = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const board = await Board.findById(id);
+
+    if (!board) {
+      return res.status(404).json({ message: "Board not found" });
+    }
+
+    // Only owner can delete
+    if (!board.owner.equals(req.user.id)) {
+      return res
+        .status(403)
+        .json({ message: "You don't have permission to delete this board" });
+    }
+
+    // Remove board reference from user
+    await User.findByIdAndUpdate(req.user.id, {
+      $pull: { boards: board._id },
+    });
+
+    // Delete board
+    await Board.findByIdAndDelete(id);
+
+    return res.json({ message: "Board deleted successfully" });
+  } catch (error) {
+    console.error("Delete board error:", error);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
+  }
+};

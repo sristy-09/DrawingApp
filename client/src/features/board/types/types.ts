@@ -35,6 +35,8 @@ export interface FabricCanvasRef {
   resetZoom: () => void;
   getZoom: () => number;
   getThumbnail: (width?: number, height?: number) => string;
+  undo: () => void;
+  redo: () => void;
 }
 
 export interface FabricCanvasProps {
@@ -42,9 +44,12 @@ export interface FabricCanvasProps {
   brushWidth: number;
   tool: Tool;
   loadJson?: string;
+  onToolChange?: (tool: Tool) => void;
 }
 
 export interface ToolbarProps {
   tool: Tool;
   setTool: (tool: Tool) => void;
 }
+
+export type DockPosition = "top" | "right" | "bottom" | "left";

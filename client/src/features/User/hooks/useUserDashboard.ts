@@ -57,6 +57,10 @@ export function useUserDashboard() {
     navigate("/");
   };
 
+  const handleBoardDeleted = (boardId: string) => {
+    setBoards((prev) => prev.filter((b) => b._id !== boardId));
+  };
+
   return {
     user,
     boards,
@@ -68,5 +72,6 @@ export function useUserDashboard() {
     createBoard,
     handleLogout,
     setTheme,
+    handleBoardDeleted,
   };
 }

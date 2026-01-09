@@ -3,6 +3,7 @@ import FabricCanvas from "./FabricCanvas";
 import { useBoard } from "../hooks/useBoard";
 import { FaBars, FaSearchMinus, FaSearchPlus, FaTimes } from "react-icons/fa";
 import { useState } from "react";
+import type { Tool } from "../types/types";
 
 const Board: React.FC = () => {
   const {
@@ -19,6 +20,8 @@ const Board: React.FC = () => {
     handleZoomIn,
     handleZoomOut,
     handleResetZoom,
+    handleUndo,
+    handleRedo
   } = useBoard();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -33,6 +36,26 @@ const Board: React.FC = () => {
     setMenuOpen(false);
   };
 
+  const handleToolChange = (newTool: Tool) => {
+    setTool(newTool);
+  };
+
+  // Predefined color palette
+  const colorPalette = [
+    "#000000", // Black
+    "#FFFFFF", // White
+    "#FF0000", // Red
+    "#00FF00", // Green
+    "#0000FF", // Blue
+    "#FFFF00", // Yellow
+    "#FF00FF", // Magenta
+    "#00FFFF", // Cyan
+    "#FF8800", // Orange
+    "#8800FF", // Purple
+    "#00FF88", // Mint
+    "#FF0088", // Pink
+  ];
+
   return (
     <div className="board-container h-screen w-screen overflow-hidden relative">
       <Toolbar tool={tool} setTool={setTool} />
@@ -42,6 +65,7 @@ const Board: React.FC = () => {
         color={color}
         brushWidth={brushWidth}
         tool={tool}
+        onToolChange={handleToolChange}
       />
 
       {/* Hamburger Menu Button - Top Left Corner */}
@@ -74,7 +98,19 @@ const Board: React.FC = () => {
         </div>
 
         {/* Menu Content */}
-        <div className="p-3 space-y-4">
+        <div className="p-3 space-y-4 overflow-auto h-[calc(100%-60px)]">
+          {/* Undo/Redo Buttons */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">History</label>
+            <div className="flex items-center space-x-2">
+              <button onClick={handleUndo}
+              className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center">
+
+              </button>
+            </div>
+
+          </div>
+
           {/* Brush Width Control */}
           <div className="space-y-3">
             <label className="block text-sm font-medium text-gray-700">
