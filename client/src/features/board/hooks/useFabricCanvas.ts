@@ -75,10 +75,12 @@ export function useFabricCanvas({
       }
 
       // Remove any redo states
-      historyRef.current = historyRef.current.slice(
-        0,
-        historyIndexRef.current + 1
-      );
+      if (historyIndexRef.current < historyRef.current.length - 1) {
+        historyRef.current = historyRef.current.slice(
+          0,
+          historyIndexRef.current + 1
+        );
+      }
 
       // Add new state
       historyRef.current.push(state);
@@ -141,7 +143,8 @@ export function useFabricCanvas({
       );
 
       canvas.loadFromJSON(stateObj, () => {
-        canvas.renderAll();
+        canvas.renderOnAddRemove = true;
+        canvas.requestRenderAll();
         console.log("✅ Undo complete");
 
         // Small delay to let Fabric.js finish
@@ -197,7 +200,8 @@ export function useFabricCanvas({
       );
 
       canvas.loadFromJSON(stateObj, () => {
-        canvas.renderAll();
+        canvas.renderOnAddRemove = true;
+        canvas.requestRenderAll();
         console.log("✅ Redo complete");
 
         setTimeout(() => {
@@ -466,6 +470,10 @@ export function useFabricCanvas({
 
           e.path.setCoords();
           canvas.requestRenderAll();
+
+          setTimeout(() => {
+            saveHistory();
+          }, 0);
         };
 
         canvas.on("path:created", onPathCreated);
@@ -587,6 +595,10 @@ export function useFabricCanvas({
 
           canvas.discardActiveObject();
           canvas.requestRenderAll();
+
+          setTimeout(() => {
+            saveHistory();
+          }, 0);
         };
 
         canvas.on("mouse:down", onDown);
@@ -763,6 +775,11 @@ export function useFabricCanvas({
           isDrawingShapeRef.current = false;
           currentShapeRef.current = null;
           canvas?.requestRenderAll();
+
+          // Save History once
+          setTimeout(() => {
+            saveHistory();
+          }, 0);
         };
 
         canvas.on("mouse:down", onDown);
@@ -807,6 +824,9 @@ export function useFabricCanvas({
 
       // Don't save history during load
       isUndoRedoRef.current = true;
+
+      // Disable render during load
+      canvas.renderOnAddRemove = false;
 
       canvas.loadFromJSON(json, () => {
         canvas.renderAll();
@@ -905,10 +925,8 @@ export function useFabricCanvas({
       }, 100);
     };
 
-    fab.on("object:added", handleHistoryEvent);
     fab.on("object:modified", handleHistoryEvent);
     fab.on("object:removed", handleHistoryEvent);
-    fab.on("path:created", handleHistoryEvent);
 
     console.log("✅ History listeners attached to canvas");
 
