@@ -815,42 +815,49 @@ export function useFabricCanvas({
   }, []);
 
   // Load canvas from JSON
-  const loadFromJson = useCallback(
-    (json: string) => {
-      const canvas = canvasInstance.current;
-      if (!canvas) return;
+  const loadFromJson = useCallback((json: string) => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
 
-      console.log("Loading canvas from JSON, setting isUndoRedo=true");
+    console.log("Loading canvas from JSON, setting isUndoRedo=true");
 
-      // Don't save history during load
-      isUndoRedoRef.current = true;
+    // Don't save history during load
+    // isUndoRedoRef.current = true;
 
-      // Disable render during load
-      canvas.renderOnAddRemove = false;
+    // Disable render during load
+    canvas.renderOnAddRemove = false;
 
-      canvas.loadFromJSON(json, () => {
-        canvas.renderAll();
-        console.log("Canvas loaded from JSON");
+    canvas.loadFromJSON(json, () => {
+      canvas.renderOnAddRemove = true;
+      canvas.renderAll();
+      console.log("Canvas loaded from JSON");
 
-        // Reset history with loaded state
-        historyRef.current = [];
-        historyIndexRef.current = -1;
+      // Reset history with loaded state
+      historyRef.current = [];
+      historyIndexRef.current = -1;
 
-        // CRITICAL: Reset flag FIRST, then save history
-        setTimeout(() => {
-          console.log("🔓 Resetting isUndoRedo flag to false");
-          isUndoRedoRef.current = false;
+      try {
+        const canvasJSON = canvas.toJSON();
+        if (canvasJSON.objects) {
+          canvasJSON.objects = canvasJSON.objects.filter(
+            (obj: any) => !obj.excludeFromExport
+          );
+        }
+        const state = JSON.stringify(canvasJSON);
 
-          // Now save the loaded state
-          setTimeout(() => {
-            console.log("💾 Saving loaded state to history");
-            saveHistory();
-          }, 100);
-        }, 100);
-      });
-    },
-    [saveHistory]
-  );
+        historyRef.current.push(state);
+        historyIndexRef.current = 0;
+
+        console.log("💾 Initial state saved to history", {
+          index: historyIndexRef.current,
+          total: historyRef.current.length,
+          objectCount: canvasJSON.objects?.length || 0,
+        });
+      } catch (error) {
+        console.error("❌ Error saving initial state:", error);
+      }
+    });
+  }, []);
 
   // -----------------------------
   // MOUNT / UNMOUNT (ONLY ONCE)
