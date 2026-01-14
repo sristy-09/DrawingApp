@@ -1,4 +1,4 @@
-import Navbar from "../components/Navbar";
+import Navbar from "../features/core/components/Navbar";
 import { Badge } from "../features/core/components/ui/badge";
 import { FcCollaboration } from "react-icons/fc";
 import { Button } from "../features/core/components/ui/button";
@@ -10,7 +10,7 @@ function HomePage() {
   return (
     <div>
       <Navbar />
-      <div className="relative w-full md:h-[700px] h-screen bg-[#faf5ff] overflow-hidden">
+      <div className="relative w-full md:h-[700px] h-screen bg-background text-foreground overflow-hidden">
         <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
           <div className="max-w-7xl mx-auto px-12 md:px-14">
             <div className="flex flex-col items-center space-y-6 text-center">

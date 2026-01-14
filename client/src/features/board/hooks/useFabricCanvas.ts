@@ -6,16 +6,238 @@ export function useFabricCanvas({
   color,
   brushWidth,
   tool,
+  onToolChange,
 }: {
   color: string;
   brushWidth: number;
   tool: Tool;
+  onToolChange?: (tool: Tool) => void; // Optional callback to update tool state
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasInstance = useRef<fabric.Canvas | null>(null);
   const isPanningRef = useRef<boolean>(false);
   const lastPosXRef = useRef<number>(0);
   const lastPosYRef = useRef<number>(0);
+
+  const activeToolHandlersRef = useRef<{
+    down?: any;
+    move?: any;
+    up?: any;
+    extra?: any;
+  }>({});
+
+  // Track current shape being drawn and eraser state
+  const currentShapeRef = useRef<fabric.Object | null>(null);
+  const isDrawingShapeRef = useRef<boolean>(false);
+  const eraserCircleRef = useRef<fabric.Circle | null>(null);
+  const isErasingRef = useRef<boolean>(false);
+
+  // UNDO/REDO STATE
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef<number>(-1);
+  const isUndoRedoRef = useRef<boolean>(false);
+
+  const saveHistory = useCallback(() => {
+    const canvas = canvasInstance.current;
+
+    console.log("💾 saveHistory called", {
+      hasCanvas: !!canvas,
+      isUndoRedo: isUndoRedoRef.current,
+      currentIndex: historyIndexRef.current,
+      historyLength: historyRef.current.length,
+    });
+
+    if (!canvas) {
+      console.log("❌ No canvas, skipping");
+      return;
+    }
+
+    if (isUndoRedoRef.current) {
+      console.log("❌ Undo/redo in progress, skipping");
+      return;
+    }
+
+    try {
+      const json = canvas.toJSON();
+      // Filter out temp objects
+      if (json.objects) {
+        json.objects = json.objects.filter(
+          (obj: any) => !obj.excludeFromExport
+        );
+      }
+      const state = JSON.stringify(json);
+
+      // Don't save if state hasn't changed
+      const lastState = historyRef.current[historyIndexRef.current];
+      if (lastState === state) {
+        console.log("⏭️ State unchanged, skipping");
+        return;
+      }
+
+      // Remove any redo states
+      if (historyIndexRef.current < historyRef.current.length - 1) {
+        historyRef.current = historyRef.current.slice(
+          0,
+          historyIndexRef.current + 1
+        );
+      }
+
+      // Add new state
+      historyRef.current.push(state);
+      historyIndexRef.current++;
+
+      console.log("✅ History saved!", {
+        index: historyIndexRef.current,
+        total: historyRef.current.length,
+        objectCount: json.objects?.length || 0,
+      });
+
+      // Limit history to 50 states
+      if (historyRef.current.length > 50) {
+        historyRef.current.shift();
+        historyIndexRef.current--;
+      }
+    } catch (error) {
+      console.error("❌ Error saving history:", error);
+    }
+  }, []);
+
+  // ===== UNDO FUNCTION =====
+  const undo = useCallback(() => {
+    const canvas = canvasInstance.current;
+
+    console.log("⏪ Undo called", {
+      hasCanvas: !!canvas,
+      currentIndex: historyIndexRef.current,
+      historyLength: historyRef.current.length,
+    });
+
+    if (!canvas) {
+      console.log("❌ No canvas");
+      return;
+    }
+
+    if (historyIndexRef.current <= 0) {
+      console.log("❌ No more undo states (at beginning)");
+      return;
+    }
+
+    console.log(
+      "⏪ Undoing from index",
+      historyIndexRef.current,
+      "to",
+      historyIndexRef.current - 1
+    );
+
+    isUndoRedoRef.current = true;
+    historyIndexRef.current--;
+
+    const state = historyRef.current[historyIndexRef.current];
+
+    try {
+      const stateObj = JSON.parse(state);
+      console.log(
+        "📥 Loading state with",
+        stateObj.objects?.length || 0,
+        "objects"
+      );
+
+      canvas.loadFromJSON(stateObj, () => {
+        canvas.renderOnAddRemove = true;
+        canvas.requestRenderAll();
+        console.log("✅ Undo complete");
+
+        // Small delay to let Fabric.js finish
+        setTimeout(() => {
+          isUndoRedoRef.current = false;
+        }, 50);
+      });
+    } catch (error) {
+      console.error("❌ Undo error:", error);
+      isUndoRedoRef.current = false;
+      historyIndexRef.current++; // Restore index on error
+    }
+  }, []);
+
+  // ===== REDO FUNCTION =====
+  const redo = useCallback(() => {
+    const canvas = canvasInstance.current;
+
+    console.log("⏩ Redo called", {
+      hasCanvas: !!canvas,
+      currentIndex: historyIndexRef.current,
+      historyLength: historyRef.current.length,
+    });
+
+    if (!canvas) {
+      console.log("❌ No canvas");
+      return;
+    }
+
+    if (historyIndexRef.current >= historyRef.current.length - 1) {
+      console.log("❌ No more redo states (at end)");
+      return;
+    }
+
+    console.log(
+      "⏩ Redoing from index",
+      historyIndexRef.current,
+      "to",
+      historyIndexRef.current + 1
+    );
+
+    isUndoRedoRef.current = true;
+    historyIndexRef.current++;
+
+    const state = historyRef.current[historyIndexRef.current];
+
+    try {
+      const stateObj = JSON.parse(state);
+      console.log(
+        "📥 Loading state with",
+        stateObj.objects?.length || 0,
+        "objects"
+      );
+
+      canvas.loadFromJSON(stateObj, () => {
+        canvas.renderOnAddRemove = true;
+        canvas.requestRenderAll();
+        console.log("✅ Redo complete");
+
+        setTimeout(() => {
+          isUndoRedoRef.current = false;
+        }, 50);
+      });
+    } catch (error) {
+      console.error("❌ Redo error:", error);
+      isUndoRedoRef.current = false;
+      historyIndexRef.current--; // Restore index on error
+    }
+  }, []);
+
+  function cleanupToolHandlers(canvas: fabric.Canvas) {
+    const h = activeToolHandlersRef.current;
+
+    if (h.down) canvas.off("mouse:down", h.down);
+    if (h.move) canvas.off("mouse:move", h.move);
+    if (h.up) canvas.off("mouse:up", h.up);
+    if (h.extra) canvas.off("path:created", h.extra);
+    activeToolHandlersRef.current = {};
+
+    // Clean up any leftover shape
+    if (currentShapeRef.current) {
+      canvas.remove(currentShapeRef.current);
+      currentShapeRef.current = null;
+    }
+    isDrawingShapeRef.current = false;
+
+    // Cleanup any leftover eraser circle
+    if (eraserCircleRef.current) {
+      canvas.remove(eraserCircleRef.current);
+      eraserCircleRef.current = null;
+    }
+    isErasingRef.current = false;
+  }
 
   // -----------------------------
   // ZOOM FUNCTIONS
@@ -27,8 +249,13 @@ export function useFabricCanvas({
     const currentZoom = canvas.getZoom();
     const newZoom = Math.min(currentZoom * 1.1, 5); // Max 5x zoom
     canvas.setZoom(newZoom);
+
+    if (canvas?.isDrawingMode && canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.width = brushWidth;
+    }
+
     canvas.renderAll();
-  }, []);
+  }, [brushWidth]);
 
   const zoomOut = useCallback(() => {
     const canvas = canvasInstance.current;
@@ -37,8 +264,13 @@ export function useFabricCanvas({
     const currentZoom = canvas.getZoom();
     const newZoom = Math.max(currentZoom / 1.1, 0.1); // Min 0.1x zoom
     canvas.setZoom(newZoom);
+
+    if (canvas?.isDrawingMode && canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.width = brushWidth;
+    }
+
     canvas.renderAll();
-  }, []);
+  }, [brushWidth]);
 
   const resetZoom = useCallback(() => {
     const canvas = canvasInstance.current;
@@ -46,8 +278,13 @@ export function useFabricCanvas({
 
     canvas.setZoom(1);
     canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+
+    if (canvas?.isDrawingMode && canvas.freeDrawingBrush) {
+      canvas.freeDrawingBrush.width = brushWidth;
+    }
+
     canvas.renderAll();
-  }, []);
+  }, [brushWidth]);
 
   const getZoom = useCallback(() => {
     const canvas = canvasInstance.current;
@@ -61,35 +298,72 @@ export function useFabricCanvas({
     const canvas = canvasInstance.current;
     if (!canvas) return "";
 
-    // Store current zoom and viewport
-    const currentZoom = canvas.getZoom();
-    const currentVPT = canvas.viewportTransform?.slice() as
-      | fabric.TMat2D
-      | undefined;
-
-    // Reset zoom and viewport for thumbnail
-    canvas.setZoom(1);
-    canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
-    canvas.renderAll();
-
-    // Generate thumbnail as data URL
-    const dataURL = canvas.toDataURL({
-      format: "png",
-      quality: 0.8,
-      multiplier: Math.min(
-        width / canvas.getWidth(),
-        height / canvas.getHeight()
-      ),
-    });
-
-    // Restore zoom and viewport
-    canvas.setZoom(currentZoom);
-    if (currentVPT) {
-      canvas.viewportTransform = currentVPT;
+    // Don't generate thumbnail while user is drawing
+    if (isDrawingShapeRef.current || isErasingRef.current) {
+      return "";
     }
-    canvas.renderAll();
 
-    return dataURL;
+    try {
+      // Store current zoom and viewport
+      const currentZoom = canvas.getZoom();
+      const currentVPT = canvas.viewportTransform?.slice() as
+        | fabric.TMat2D
+        | undefined;
+
+      // Reset zoom and viewport for thumbnail
+      canvas.setZoom(1);
+      canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
+      canvas.renderAll();
+
+      // Generate thumbnail as data URL
+      const dataURL = canvas.toDataURL({
+        format: "png",
+        quality: 0.8,
+        multiplier: Math.min(
+          width / canvas.getWidth(),
+          height / canvas.getHeight()
+        ),
+      });
+
+      // Restore zoom and viewport
+      canvas.setZoom(currentZoom);
+      if (currentVPT) {
+        canvas.viewportTransform = currentVPT;
+      }
+      canvas.renderAll();
+
+      return dataURL;
+    } catch (error) {
+      console.error("❌ Thumbnail generation error:", error);
+      return "";
+    }
+  }, []);
+
+  // -----------------------------
+  // CLEAR CANVAS
+  // -----------------------------
+  const clear = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    canvas.clear();
+
+    // Clear history
+    historyRef.current = [];
+    historyIndexRef.current = -1;
+
+    // Save empty state
+    setTimeout(() => {
+      console.log("Saving cleared canvas state");
+      saveHistory();
+    }, 100);
+  }, [saveHistory]);
+
+  // -----------------------------
+  // GET CANVAS INSTANCE
+  // -----------------------------
+  const getCanvas = useCallback(() => {
+    return canvasInstance.current;
   }, []);
 
   // -----------------------------
@@ -108,18 +382,49 @@ export function useFabricCanvas({
       const canvas = canvasInstance.current;
       if (!canvas) return;
 
+      /* ----------------------------------
+       CLEANUP PREVIOUS TOOL
+      ---------------------------------- */
+      cleanupToolHandlers(canvas);
+
+      // Restore any faded objects(eraser safety)
+      canvas.forEachObject((obj) => {
+        if (obj.opacity !== 1) {
+          obj.set({ opacity: 1 });
+        }
+      });
+
+      // Clear top context (eraser cursor)
+      canvas.contextTop?.clearRect(0, 0, canvas.width!, canvas.height!);
+
       // Reset panning
       isPanningRef.current = false;
 
-      canvas.isDrawingMode = _tool === "brush" || _tool === "eraser";
+      /* ----------------------------------
+       BASE CANVAS STATE
+      ---------------------------------- */
+      canvas.isDrawingMode = _tool === "brush";
       canvas.selection = _tool === "select";
 
+      /* ----------------------------------
+       CURSORS
+      ---------------------------------- */
+      // Set cursor based on tool - FIXED: Always show crosshair for drawing tools
       if (_tool === "pan") {
         canvas.defaultCursor = "grab";
+        canvas.hoverCursor = "grab";
       } else if (_tool === "brush" || _tool === "eraser") {
         canvas.defaultCursor = "crosshair";
+        canvas.hoverCursor = "crosshair";
+      } else if (_tool === "rect" || _tool === "circle" || _tool === "line") {
+        canvas.defaultCursor = "crosshair";
+        canvas.hoverCursor = "crosshair";
+      } else if (_tool === "select") {
+        canvas.defaultCursor = "default";
+        canvas.hoverCursor = "move";
       } else {
         canvas.defaultCursor = "default";
+        canvas.hoverCursor = "default";
       }
 
       // Make all objects selectable or not based on tool
@@ -135,11 +440,8 @@ export function useFabricCanvas({
         canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
       }
 
-      // Configure brush for drawing or erasing
-      if (_tool === "eraser") {
-        canvas.freeDrawingBrush.color = "#FFFFFF"; // White for eraser
-        canvas.freeDrawingBrush.width = _width * 2; // Eraser is wider
-      } else {
+      // Configure brush for drawing
+      if (_tool === "brush") {
         canvas.freeDrawingBrush.color = _color;
         canvas.freeDrawingBrush.width = _width;
       }
@@ -151,30 +453,171 @@ export function useFabricCanvas({
 
       canvas.renderAll();
 
-      // Remove previous listeners
-      canvas.off("mouse:down");
-      canvas.off("mouse:move");
-      canvas.off("mouse:up");
-      canvas.off("path:created");
+      /* ----------------------------------
+       BRUSH TOOL
+      ---------------------------------- */
+      // Handle brush drawing
+      if (_tool === "brush") {
+        const onPathCreated = (e: any) => {
+          if (!e.path) return;
 
-      // Handle brush and eraser
-      if (_tool === "brush" || _tool === "eraser") {
-        canvas.on("path:created", (e) => {
-          if (e.path) {
-            e.path.selectable = false;
-            e.path.evented = false;
+          e.path.set({
+            strokeUniform: true, // it tells fabric "Do NOT scale the stroke based on viewport zoom"
+            objectCaching: false,
+            selectable: true,
+            evented: false,
+          });
 
-            // For eraser, set globalCompositeOperation to erase
-            if (_tool === "eraser") {
-              e.path.globalCompositeOperation = "destination-out";
-            }
-          }
-        });
+          e.path.setCoords();
+          canvas.requestRenderAll();
+
+          setTimeout(() => {
+            saveHistory();
+          }, 0);
+        };
+
+        canvas.on("path:created", onPathCreated);
+        activeToolHandlersRef.current.extra = onPathCreated;
       }
 
+      /* ----------------------------------
+       ERASER TOOL
+      ---------------------------------- */
+      // Handle eraser - drag to select and preview deletion
+      if (_tool === "eraser") {
+        let touchedObjects = new Set<fabric.Object>();
+        const eraserRadius = _width * 3; // Eraser size
+
+        const checkObjectIntersection = (
+          obj: fabric.Object,
+          cursorX: number,
+          cursorY: number
+        ): boolean => {
+          if (obj === eraserCircleRef.current) return false;
+
+          // Ignore objects marked as excludeFromExport (temp objects)
+          if ((obj as any).excludeFromExport) return false;
+
+          const objBounds = obj.getBoundingRect();
+          const distance = Math.sqrt(
+            Math.pow(cursorX - (objBounds.left + objBounds.width / 2), 2) +
+              Math.pow(cursorY - (objBounds.top + objBounds.height / 2), 2)
+          );
+
+          // Check if cursor circle intersects with object
+          return (
+            distance <
+            eraserRadius + Math.max(objBounds.width, objBounds.height) / 2
+          );
+        };
+
+        const onDown = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+          isErasingRef.current = true;
+          touchedObjects.clear();
+          const pointer = canvas.getPointer(e.e);
+
+          // Create eraser circle cursor
+          eraserCircleRef.current = new fabric.Circle({
+            left: pointer.x,
+            top: pointer.y,
+            radius: eraserRadius,
+            fill: "transparent",
+            stroke: "#999999",
+            strokeWidth: 2,
+            strokeDasharray: [5, 5],
+            selectable: false,
+            evented: false,
+            excludeFromExport: true,
+            objectCaching: false,
+            opacity: 0.6,
+            originX: "center",
+            originY: "center",
+          });
+          canvas.add(eraserCircleRef.current);
+          canvas.renderAll();
+        };
+
+        const onMove = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+          if (!isErasingRef.current || !eraserCircleRef.current) return;
+
+          const pointer = canvas.getPointer(e.e);
+
+          // Move eraser circle with cursor
+          eraserCircleRef.current.set({
+            left: pointer.x,
+            top: pointer.y,
+          });
+
+          // Check intersection with all objects
+          canvas.forEachObject((obj) => {
+            if (obj === eraserCircleRef.current) return;
+            if ((obj as any).excludeFromExport) return;
+
+            const isIntersecting = checkObjectIntersection(
+              obj,
+              pointer.x,
+              pointer.y
+            );
+
+            if (isIntersecting) {
+              if (!touchedObjects.has(obj)) {
+                touchedObjects.add(obj);
+                obj.set({ opacity: 0.3 }); // Preview deletion
+              }
+            } else {
+              if (touchedObjects.has(obj)) {
+                obj.set({ opacity: 1 }); // Restore opacity
+                touchedObjects.delete(obj);
+              }
+            }
+          });
+
+          canvas.renderAll();
+        };
+
+        const onUp = () => {
+          if (!isErasingRef.current) return;
+
+          isErasingRef.current = false;
+
+          // Delete all touched objects
+          touchedObjects.forEach((obj) => {
+            obj.set({ opacity: 1 });
+            canvas.remove(obj);
+          });
+          touchedObjects.clear();
+
+          // Remove the eraser circle
+          if (eraserCircleRef.current) {
+            canvas.remove(eraserCircleRef.current);
+            eraserCircleRef.current = null;
+          }
+
+          canvas.discardActiveObject();
+          canvas.requestRenderAll();
+
+          setTimeout(() => {
+            saveHistory();
+          }, 0);
+        };
+
+        canvas.on("mouse:down", onDown);
+        canvas.on("mouse:move", onMove);
+        canvas.on("mouse:up", onUp);
+
+        activeToolHandlersRef.current = {
+          down: onDown,
+          move: onMove,
+          up: onUp,
+        };
+      }
+
+      /* ----------------------------------
+       PAN TOOL
+      ---------------------------------- */
       // Handle pan tool
       if (_tool === "pan") {
-        canvas.on("mouse:down", (e) => {
+        const onDown = (e: any) => {
           const evt = e.e as MouseEvent | PointerEvent;
           if (evt.altKey || _tool === "pan") {
             isPanningRef.current = true;
@@ -183,9 +626,9 @@ export function useFabricCanvas({
             lastPosXRef.current = evt.clientX;
             lastPosYRef.current = evt.clientY;
           }
-        });
+        };
 
-        canvas.on("mouse:move", (e) => {
+        const onMove = (e: any) => {
           const evt = e.e as MouseEvent | PointerEvent;
           if (isPanningRef.current && canvas.viewportTransform) {
             const vpt = canvas.viewportTransform;
@@ -195,14 +638,27 @@ export function useFabricCanvas({
             lastPosXRef.current = evt.clientX;
             lastPosYRef.current = evt.clientY;
           }
-        });
+        };
 
-        canvas.on("mouse:up", () => {
+        const onUp = () => {
           isPanningRef.current = false;
           canvas.defaultCursor = "grab";
-        });
+        };
+
+        canvas.on("mouse:down", onDown);
+        canvas.on("mouse:move", onMove);
+        canvas.on("mouse:up", onUp);
+
+        activeToolHandlersRef.current = {
+          down: onDown,
+          move: onMove,
+          up: onUp,
+        };
       }
 
+      /* ----------------------------------
+       SHAPE TOOLS
+      ---------------------------------- */
       // Handle shape drawing tools
       if (
         _tool !== "brush" &&
@@ -210,19 +666,14 @@ export function useFabricCanvas({
         _tool !== "select" &&
         _tool !== "pan"
       ) {
-        let shape: fabric.Object | null = null;
-        let isDrawing = false;
-        let startX = 0;
-        let startY = 0;
-
         const onDown = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
           const canvas = canvasInstance.current;
           if (!canvas) return;
 
-          isDrawing = true;
+          isDrawingShapeRef.current = true;
           const pointer = canvas.getPointer(e.e);
-          startX = pointer.x;
-          startY = pointer.y;
+          const startX = pointer.x;
+          const startY = pointer.y;
 
           const opts = {
             left: startX,
@@ -230,12 +681,14 @@ export function useFabricCanvas({
             fill: "transparent",
             stroke: _color,
             strokeWidth: _width,
-            selectable: false,
-            evented: false,
-            hoverCursor: "default",
-            hasControls: false,
-            hasBorders: false,
+            selectable: true,
+            evented: true,
+            hoverCursor: "move",
+            hasControls: true,
+            hasBorders: true,
           };
+
+          let shape: fabric.Object | null = null;
 
           switch (_tool) {
             case "rect":
@@ -250,19 +703,25 @@ export function useFabricCanvas({
           }
 
           if (shape) {
+            currentShapeRef.current = shape;
+            (shape as any)._startX = startX;
+            (shape as any)._startY = startY;
             canvas.add(shape);
             canvas.requestRenderAll();
           }
         };
 
         const onMove = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
-          if (!shape || !isDrawing) return;
+          if (!currentShapeRef.current || !isDrawingShapeRef.current) return;
           const canvas = canvasInstance.current;
           if (!canvas) return;
 
+          const shape = currentShapeRef.current;
           const pointer = canvas.getPointer(e.e);
           const x = pointer.x;
           const y = pointer.y;
+          const startX = (shape as any)._startX;
+          const startY = (shape as any)._startY;
 
           switch (_tool) {
             case "rect": {
@@ -289,40 +748,115 @@ export function useFabricCanvas({
         };
 
         const onUp = () => {
-          if (shape && isDrawing) {
+          if (currentShapeRef.current && isDrawingShapeRef.current) {
+            const shape = currentShapeRef.current;
+
+            // Make shape selectable and movable
             shape.set({
-              selectable: false,
-              evented: false,
-              hasControls: false,
-              hasBorders: false,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
             });
             shape.setCoords();
+
+            // Set the newly created shape as active object to show selection
+            canvas.discardActiveObject();
+            canvas.setActiveObject(shape);
+            canvas.renderAll();
+
+            // Auto-switch to select tool after drawing shape
+            if (onToolChange) {
+              setTimeout(() => {
+                onToolChange("select");
+              }, 0);
+            }
           }
-          isDrawing = false;
-          shape = null;
+          isDrawingShapeRef.current = false;
+          currentShapeRef.current = null;
           canvas?.requestRenderAll();
+
+          // Save History once
+          setTimeout(() => {
+            saveHistory();
+          }, 0);
         };
 
         canvas.on("mouse:down", onDown);
         canvas.on("mouse:move", onMove);
         canvas.on("mouse:up", onUp);
+
+        activeToolHandlersRef.current = {
+          down: onDown,
+          move: onMove,
+          up: onUp,
+        };
       }
     },
-    []
+    [onToolChange]
   );
 
-  // -----------------------------
-  // CLEAR CANVAS
-  // -----------------------------
-  const clear = useCallback(() => {
-    canvasInstance.current?.clear();
+  // save canvas to JSON
+  const saveToJson = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return "";
+
+    // Get canvas JSON and filter out temporary objects
+    const canvasJSON = canvas.toJSON();
+
+    // Filter out objects marked as excludeFromExport
+    if (canvasJSON.objects) {
+      canvasJSON.objects = canvasJSON.objects.filter(
+        (obj: any) => !obj.excludeFromExport
+      );
+    }
+
+    return JSON.stringify(canvasJSON);
   }, []);
 
-  // -----------------------------
-  // GET CANVAS INSTANCE
-  // -----------------------------
-  const getCanvas = useCallback(() => {
-    return canvasInstance.current;
+  // Load canvas from JSON
+  const loadFromJson = useCallback((json: string) => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    console.log("Loading canvas from JSON, setting isUndoRedo=true");
+
+    // Don't save history during load
+    // isUndoRedoRef.current = true;
+
+    // Disable render during load
+    canvas.renderOnAddRemove = false;
+
+    canvas.loadFromJSON(json, () => {
+      canvas.renderOnAddRemove = true;
+      canvas.renderAll();
+      console.log("Canvas loaded from JSON");
+
+      // Reset history with loaded state
+      historyRef.current = [];
+      historyIndexRef.current = -1;
+
+      try {
+        const canvasJSON = canvas.toJSON();
+        if (canvasJSON.objects) {
+          canvasJSON.objects = canvasJSON.objects.filter(
+            (obj: any) => !obj.excludeFromExport
+          );
+        }
+        const state = JSON.stringify(canvasJSON);
+
+        historyRef.current.push(state);
+        historyIndexRef.current = 0;
+
+        console.log("💾 Initial state saved to history", {
+          index: historyIndexRef.current,
+          total: historyRef.current.length,
+          objectCount: canvasJSON.objects?.length || 0,
+        });
+      } catch (error) {
+        console.error("❌ Error saving initial state:", error);
+      }
+    });
   }, []);
 
   // -----------------------------
@@ -351,89 +885,77 @@ export function useFabricCanvas({
     resize();
     window.addEventListener("resize", resize);
 
-    // Enhanced wheel zoom - works with both mouse and touchpad
-    const handleWheel = (e: WheelEvent) => {
-      console.log("🖱️ WHEEL EVENT FIRED:", {
-        deltaY: e.deltaY,
-        deltaX: e.deltaX,
-        deltaMode: e.deltaMode,
-        ctrlKey: e.ctrlKey,
-        type: e.type,
-      });
-
+    // Use Fabric.js built-in mouse:wheel event for zoom
+    fab.on("mouse:wheel", (opt) => {
+      const e = opt.e as WheelEvent;
       e.preventDefault();
       e.stopPropagation();
 
-      let zoom = fab.getZoom();
-      console.log("📊 Current zoom before:", zoom);
-
       const delta = e.deltaY;
+      let zoom = fab.getZoom();
 
-      // Multiple detection methods
-      const isTouchpad =
-        Math.abs(delta) < 50 || e.ctrlKey || Math.abs(e.deltaX) > 0;
-      console.log("📱 Detected as:", isTouchpad ? "TOUCHPAD" : "MOUSE WHEEL");
-
-      // Apply zoom with different sensitivities
-      if (isTouchpad) {
-        // For touchpad - more gradual
-        zoom *= 1 - delta * 0.01;
-        console.log("🔧 Touchpad zoom calculation:", delta * 0.01);
+      // Apply zoom - scroll up (negative delta) = zoom in, scroll down (positive delta) = zoom out
+      let newZoom: number;
+      if (delta < 0) {
+        newZoom = zoom * 1.05; // Zoom in
       } else {
-        // For mouse wheel - discrete steps
-        zoom *= delta > 0 ? 0.9 : 1.1;
-        console.log(
-          "🔧 Mouse wheel zoom:",
-          delta > 0 ? "OUT (0.9)" : "IN (1.1)"
-        );
+        newZoom = zoom * 0.95; // Zoom out
       }
 
-      // Clamp zoom
-      const oldZoom = zoom;
-      zoom = Math.max(0.1, Math.min(5, zoom));
-      console.log(
-        "🔍 New zoom after:",
-        zoom,
-        oldZoom !== zoom ? "(CLAMPED)" : ""
-      );
+      // Clamp zoom between 0.1x and 5x
+      newZoom = Math.max(0.1, Math.min(5, newZoom));
 
-      // Apply zoom to canvas
-      try {
-        const point = new fabric.Point(e.offsetX, e.offsetY);
-        fab.zoomToPoint(point, zoom);
-        fab.renderAll();
-        console.log("✅ Zoom applied successfully");
-      } catch (error) {
-        console.error("❌ Zoom failed:", error);
+      // Zoom at cursor position
+      fab.zoomToPoint(new fabric.Point(e.offsetX, e.offsetY), newZoom);
+
+      if (fab.isDrawingMode && fab.freeDrawingBrush) {
+        fab.freeDrawingBrush.width = brushWidth;
       }
+
+      fab.renderAll();
+    });
+
+    console.log("Canvas initialized");
+
+    console.log("Setting up history event listeners");
+
+    const handleHistoryEvent = (e?: any) => {
+      console.log("Canvas event triggered:", e?.type || "unknown");
+
+      setTimeout(() => {
+        if (!isUndoRedoRef.current) {
+          console.log("Calling saveHistory from event");
+          saveHistory();
+        } else {
+          console.log("Skipping saveHistory (undo/redo in progress)");
+        }
+      }, 100);
     };
 
-    // Try multiple event registration methods
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    el.addEventListener("mousewheel", handleWheel as any, { passive: false });
+    fab.on("object:modified", handleHistoryEvent);
+    fab.on("object:removed", handleHistoryEvent);
 
-    console.log("🎯 Wheel event listeners registered on canvas element");
-    console.log("Canvas element:", el);
-    console.log("Canvas size:", el.width, "x", el.height);
+    console.log("✅ History listeners attached to canvas");
 
-    // Additional: Handle Ctrl+Wheel zoom (common on Windows touchpads)
-    const handleKeyWheel = (e: WheelEvent) => {
-      if (e.ctrlKey) {
-        e.preventDefault();
-        handleWheel(e);
-      }
-    };
-
-    el.addEventListener("wheel", handleKeyWheel, { passive: false });
+    // Save initial empty state
+    setTimeout(() => {
+      console.log("💾 Saving initial canvas state");
+      saveHistory();
+    }, 300);
 
     return () => {
+      console.log("🧹 Disposing canvas");
+      fab.off("object:added", handleHistoryEvent);
+      fab.off("object:modified", handleHistoryEvent);
+      fab.off("object:removed", handleHistoryEvent);
+      fab.off("path:created", handleHistoryEvent);
       window.removeEventListener("resize", resize);
-      el.removeEventListener("wheel", handleWheel);
-      el.removeEventListener("wheel", handleKeyWheel);
+      fab.off("mouse:wheel");
+      cleanupToolHandlers(fab);
       fab.dispose();
       canvasInstance.current = null;
     };
-  }, []);
+  }, [brushWidth, saveHistory]);
 
   // -----------------------------
   // UPDATE SETTINGS WHEN PROPS CHANGE
@@ -441,23 +963,6 @@ export function useFabricCanvas({
   useEffect(() => {
     applySettings({ color, brushWidth, tool });
   }, [color, brushWidth, tool, applySettings]);
-
-  // save canvas to JSON
-  const saveToJson = useCallback(() => {
-    const canvas = canvasInstance.current;
-    if (!canvas) return "";
-    return JSON.stringify(canvas.toJSON());
-  }, []);
-
-  // Load canvas from JSON
-  const loadFromJson = useCallback((json: string) => {
-    const canvas = canvasInstance.current;
-    if (!canvas) return;
-
-    canvas.loadFromJSON(json, () => {
-      canvas.renderAll();
-    });
-  }, []);
 
   return {
     canvasRef,
@@ -472,5 +977,7 @@ export function useFabricCanvas({
     resetZoom,
     getZoom,
     getThumbnail,
+    undo,
+    redo,
   };
 }

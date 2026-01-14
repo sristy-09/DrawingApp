@@ -5,12 +5,12 @@ import {
   FaMousePointer,
   FaPaintBrush,
   FaRegSquare,
-  FaSearchMinus,
-  FaSearchPlus,
   FaEraser,
   FaHandPaper,
+  FaGripVertical,
 } from "react-icons/fa";
 import type { Tool, ToolbarProps } from "../types/types";
+import { useDragToolBar } from "../hooks/useDragToolBar";
 
 const toolIcons: Record<Tool, JSX.Element> = {
   select: <FaMousePointer />,
@@ -22,99 +22,60 @@ const toolIcons: Record<Tool, JSX.Element> = {
   line: <FaMinus />,
 };
 
-const Toolbar: React.FC<ToolbarProps> = ({
-  tool,
-  setTool,
-  brushWidth,
-  setBrushWidth,
-  onClear,
-  onSave,
-  onZoomIn,
-  onZoomOut,
-  onResetZoom,
-  zoom = 1,
-}) => {
+const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool }) => {
+  const {
+    toolbarRef,
+    getToolbarStyle,
+    isDragging,
+    isVertical,
+    handleDragStart,
+  } = useDragToolBar();
   return (
-    <div className="flex flex-wrap gap-4 items-center justify-between p-4 bg-gray-100 border-b">
-      {/* Drawing Tools */}
-      <div className="flex space-x-2 rounded">
-        {Object.keys(toolIcons).map((key) => {
-          const typedKey = key as Tool;
-          return (
-            <button
-              key={typedKey}
-              onClick={() => setTool(typedKey)}
-              className={`px-4 py-2 rounded border transition-colors ${
-                tool === typedKey
-                  ? "bg-blue-500 text-white border-blue-500"
-                  : "bg-white text-gray-700 border-gray-300 hover:bg-gray-200"
-              }`}
-              title={typedKey.charAt(0).toUpperCase() + typedKey.slice(1)}
-            >
-              {toolIcons[typedKey]}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Brush Width */}
-      <div className="flex items-center space-x-2">
-        <label className="text-sm text-gray-600">Width:</label>
-        <input
-          type="range"
-          min="1"
-          max="20"
-          value={brushWidth}
-          onChange={(e) => setBrushWidth(Number(e.target.value))}
-          className="w-32"
-        />
-        <span className="text-sm text-gray-600 w-8">{brushWidth}</span>
-      </div>
-
-      {/* Zoom Controls */}
-      <div className="flex items-center space-x-2">
-        <button
-          onClick={onZoomOut}
-          className="px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors"
-          title="Zoom Out"
+    <>
+      {/* Draggable Tools Panel */}
+      <div
+        ref={toolbarRef}
+        style={getToolbarStyle()}
+        className={`z-40 bg-white border-2 border-gray-300 rounded-xl shadow-lg p-3 ${
+          isDragging ? "opacity-80 " : ""
+        }`}
+      >
+        <div
+          className={`flex ${
+            isVertical ? "flex-col" : "flex-row"
+          } items-center gap-2`}
         >
-          <FaSearchMinus />
-        </button>
-        <button
-          onClick={onResetZoom}
-          className="text-sm text-gray-600 min-w-[60px] text-center px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors"
-          title="Reset Zoom"
-        >
-          {Math.round(zoom * 100)}%
-        </button>
-        <button
-          onClick={onZoomIn}
-          className="px-3 py-2 bg-white border border-gray-300 rounded hover:bg-gray-200 transition-colors"
-          title="Zoom In"
-        >
-          <FaSearchPlus />
-        </button>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex space-x-2">
-        <button
-          onClick={onClear}
-          className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
-        >
-          Clear
-        </button>
-
-        {onSave && (
-          <button
-            onClick={onSave}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+          {/* Drag Handle - ONLY drag from here */}
+          <div
+            onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
+            className="p-2 hover:bg-gray-100 rounded transition-colors cursor-grab active:cursor-grabbing"
+            title="Drag to reposition"
           >
-            Save Now
-          </button>
-        )}
+            <FaGripVertical className="text-gray-400" />
+          </div>
+
+          {/* Tool Buttons */}
+          {Object.keys(toolIcons).map((key) => {
+            const typedKey = key as Tool;
+            return (
+              <button
+                key={typedKey}
+                onClick={() => setTool(typedKey)}
+                className={`px-1 py-1 rounded border transition-colors ${
+                  tool === typedKey
+                    ? "bg-blue-500 text-white border-blue-500"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-200"
+                }`}
+                title={typedKey.charAt(0).toUpperCase() + typedKey.slice(1)}
+              >
+                {toolIcons[typedKey]}
+              </button>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

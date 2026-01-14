@@ -1,4 +1,4 @@
-import { FaClock, FaUser } from "react-icons/fa";
+import { FaClock, FaTrash, FaUser } from "react-icons/fa";
 import { formatDistanceToNow } from "date-fns";
 import {
   Card,
@@ -8,15 +8,30 @@ import {
   CardHeader,
   CardTitle,
 } from "../../core/components/ui/card";
-import type { Board } from "../../User/components/UserDashboard";
 import { useNavigate } from "react-router";
+import type { Board } from "../../User/types/types";
+import axios from "axios";
+import { useState } from "react";
+import DeleteBoardDialog from "./DeleteBoardDialog";
 
 interface BoardListProps {
   board: Board;
+  currentUserId: string;
+  onBoardDeleted?: (boardId: string) => void;
 }
 
-const BoardList: React.FC<BoardListProps> = ({ board }) => {
+const BoardList: React.FC<BoardListProps> = ({
+  board,
+  currentUserId,
+  onBoardDeleted,
+}) => {
   const navigate = useNavigate();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isOwner = board.owner?._id === currentUserId;
+  console.log(isOwner);
+
   // Access and format updatedAt
   const updateDate = new Date(board.updatedAt);
   const formattedUpdate = formatDistanceToNow(updateDate, { addSuffix: true }); // "2 days ago"
@@ -36,11 +51,48 @@ const BoardList: React.FC<BoardListProps> = ({ board }) => {
     navigate(`/board/${board._id}`);
   };
 
+  const deleteBoard = async (boardId: string) => {
+    const res = await axios.delete(`http://localhost:3000/board/${boardId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    return res.data;
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDeleteDialog(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deleteBoard(board._id);
+
+      onBoardDeleted?.(board._id); // remove from UI
+    } catch (error) {
+      console.error("Failed to delete board");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
   return (
     <Card
-      className="cursor-pointer hover:shadow-lg transition-shadow"
+      className="relative cursor-pointer hover:shadow-lg transition-shadow"
       onClick={handleCardClick}
     >
+      {/* Delete Button */}
+      {isOwner && (
+        <button
+          onClick={handleDeleteClick}
+          className="absolute top-3 right-3 text-red-500 hover:text-red-700"
+          aria-label="Delete board"
+        >
+          <FaTrash size={14} />
+        </button>
+      )}
+
       <CardHeader>
         <CardTitle>
           <span>{board.title || "Untitled board"}</span>
@@ -57,7 +109,7 @@ const BoardList: React.FC<BoardListProps> = ({ board }) => {
             className="w-60 h-30 object-cover border-2"
           />
         ) : (
-          <div className="bg-amber-200 h-30 w-60" />
+          <div className="bg-white h-30 w-60" />
         )}
       </CardContent>
 
@@ -73,6 +125,14 @@ const BoardList: React.FC<BoardListProps> = ({ board }) => {
           {updateLabel}
         </span>
       </CardFooter>
+
+      {/* ❗ Delete Confirmation Dialog */}
+      <DeleteBoardDialog
+        open={showDeleteDialog}
+        loading={isDeleting}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleConfirmDelete}
+      />
     </Card>
   );
 };
