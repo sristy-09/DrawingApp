@@ -21,6 +21,7 @@ const Board: React.FC = () => {
     clearCanvas,
     canvasRef,
     color,
+    setColor,
     saveBoard,
     saveStatus,
     zoom = 1,
@@ -64,7 +65,7 @@ const Board: React.FC = () => {
   ];
 
   return (
-    <div className="board-container h-screen w-screen overflow-hidden relative">
+    <div className="board-container h-screen w-screen overflow-hidden relative bg-gray-100">
       <Toolbar tool={tool} setTool={setTool} />
 
       <FabricCanvas
@@ -129,6 +130,89 @@ const Board: React.FC = () => {
                 <FaRedo className="w-4 h-4" />
                 <span>Redo</span>
               </button>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200"></div>
+
+          {/* Color Picker */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Color
+            </label>
+
+            {/* Color Palette */}
+            <div className="grid grid-cols-6 gap-2">
+              {colorPalette.map((paletteColor) => (
+                <button
+                  key={paletteColor}
+                  onClick={() => setColor(paletteColor)}
+                  className={`w-10 h-10 rounded-lg border-2 transition-all ${
+                    color === paletteColor
+                      ? "border-blue-500 scale-110 shadow-lg"
+                      : "border-gray-300 hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: paletteColor }}
+                  title={paletteColor}
+                >
+                  {color === paletteColor && (
+                    <svg
+                      className="w-full h-full p-1"
+                      fill="none"
+                      stroke={
+                        paletteColor === "#FFFFFF" ? "#000000" : "#FFFFFF"
+                      }
+                      strokeWidth="3"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Color Input */}
+            <div className="flex items-center space-x-3 mt-3">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                Custom:
+              </label>
+              <div className="flex-1 flex items-center space-x-2">
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="w-12 h-10 rounded cursor-pointer border-2 border-gray-300"
+                />
+                <input
+                  type="text"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="flex-1 px-2 py-1 border-2 border-gray-300 rounded text-sm font-mono uppercase"
+                  placeholder="#000000"
+                  maxLength={7}
+                />
+              </div>
+            </div>
+
+            {/* Color Preview with Brush */}
+            <div className="flex items-center justify-center p-4 bg-gray-50 rounded">
+              <div className="flex items-center space-x-3">
+                <div
+                  className="rounded-full border-2 border-gray-300"
+                  style={{
+                    width: `${brushWidth * 2}px`,
+                    height: `${brushWidth * 2}px`,
+                    backgroundColor: color,
+                  }}
+                />
+                <span className="text-sm text-gray-600">Preview</span>
+              </div>
             </div>
           </div>
 
