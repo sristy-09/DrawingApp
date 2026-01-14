@@ -1,7 +1,14 @@
 import Toolbar from "./Toolbar";
 import FabricCanvas from "./FabricCanvas";
 import { useBoard } from "../hooks/useBoard";
-import { FaBars, FaSearchMinus, FaSearchPlus, FaTimes } from "react-icons/fa";
+import {
+  FaBars,
+  FaRedo,
+  FaSearchMinus,
+  FaSearchPlus,
+  FaTimes,
+  FaUndo,
+} from "react-icons/fa";
 import { useState } from "react";
 import type { Tool } from "../types/types";
 
@@ -21,7 +28,7 @@ const Board: React.FC = () => {
     handleZoomOut,
     handleResetZoom,
     handleUndo,
-    handleRedo
+    handleRedo,
   } = useBoard();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -101,15 +108,32 @@ const Board: React.FC = () => {
         <div className="p-3 space-y-4 overflow-auto h-[calc(100%-60px)]">
           {/* Undo/Redo Buttons */}
           <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700">History</label>
+            <label className="block text-sm font-medium text-gray-700">
+              History
+            </label>
             <div className="flex items-center space-x-2">
-              <button onClick={handleUndo}
-              className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center">
+              <button
+                onClick={handleUndo}
+                className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center space-x-2"
+                title="Undo"
+              >
+                <FaUndo className="w-4 h-4" />
+                <span>Undo</span>
+              </button>
 
+              <button
+                onClick={handleRedo}
+                className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center space-x-2"
+                title="Redo"
+              >
+                <FaRedo className="w-4 h-4" />
+                <span>Redo</span>
               </button>
             </div>
-
           </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200"></div>
 
           {/* Brush Width Control */}
           <div className="space-y-3">

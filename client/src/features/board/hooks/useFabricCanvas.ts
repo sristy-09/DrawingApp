@@ -19,10 +19,6 @@ export function useFabricCanvas({
   const lastPosXRef = useRef<number>(0);
   const lastPosYRef = useRef<number>(0);
 
-  const historyRef = useRef<string[]>([]);
-  const historyIndexRef = useRef<number>(-1);
-  const isUndoRedoRef = useRef<boolean>(false);
-
   const activeToolHandlersRef = useRef<{
     down?: any;
     move?: any;
@@ -35,6 +31,189 @@ export function useFabricCanvas({
   const isDrawingShapeRef = useRef<boolean>(false);
   const eraserCircleRef = useRef<fabric.Circle | null>(null);
   const isErasingRef = useRef<boolean>(false);
+
+  // UNDO/REDO STATE
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef<number>(-1);
+  const isUndoRedoRef = useRef<boolean>(false);
+
+  const saveHistory = useCallback(() => {
+    const canvas = canvasInstance.current;
+
+    console.log("💾 saveHistory called", {
+      hasCanvas: !!canvas,
+      isUndoRedo: isUndoRedoRef.current,
+      currentIndex: historyIndexRef.current,
+      historyLength: historyRef.current.length,
+    });
+
+    if (!canvas) {
+      console.log("❌ No canvas, skipping");
+      return;
+    }
+
+    if (isUndoRedoRef.current) {
+      console.log("❌ Undo/redo in progress, skipping");
+      return;
+    }
+
+    try {
+      const json = canvas.toJSON();
+      // Filter out temp objects
+      if (json.objects) {
+        json.objects = json.objects.filter(
+          (obj: any) => !obj.excludeFromExport
+        );
+      }
+      const state = JSON.stringify(json);
+
+      // Don't save if state hasn't changed
+      const lastState = historyRef.current[historyIndexRef.current];
+      if (lastState === state) {
+        console.log("⏭️ State unchanged, skipping");
+        return;
+      }
+
+      // Remove any redo states
+      if (historyIndexRef.current < historyRef.current.length - 1) {
+        historyRef.current = historyRef.current.slice(
+          0,
+          historyIndexRef.current + 1
+        );
+      }
+
+      // Add new state
+      historyRef.current.push(state);
+      historyIndexRef.current++;
+
+      console.log("✅ History saved!", {
+        index: historyIndexRef.current,
+        total: historyRef.current.length,
+        objectCount: json.objects?.length || 0,
+      });
+
+      // Limit history to 50 states
+      if (historyRef.current.length > 50) {
+        historyRef.current.shift();
+        historyIndexRef.current--;
+      }
+    } catch (error) {
+      console.error("❌ Error saving history:", error);
+    }
+  }, []);
+
+  // ===== UNDO FUNCTION =====
+  const undo = useCallback(() => {
+    const canvas = canvasInstance.current;
+
+    console.log("⏪ Undo called", {
+      hasCanvas: !!canvas,
+      currentIndex: historyIndexRef.current,
+      historyLength: historyRef.current.length,
+    });
+
+    if (!canvas) {
+      console.log("❌ No canvas");
+      return;
+    }
+
+    if (historyIndexRef.current <= 0) {
+      console.log("❌ No more undo states (at beginning)");
+      return;
+    }
+
+    console.log(
+      "⏪ Undoing from index",
+      historyIndexRef.current,
+      "to",
+      historyIndexRef.current - 1
+    );
+
+    isUndoRedoRef.current = true;
+    historyIndexRef.current--;
+
+    const state = historyRef.current[historyIndexRef.current];
+
+    try {
+      const stateObj = JSON.parse(state);
+      console.log(
+        "📥 Loading state with",
+        stateObj.objects?.length || 0,
+        "objects"
+      );
+
+      canvas.loadFromJSON(stateObj, () => {
+        canvas.renderOnAddRemove = true;
+        canvas.requestRenderAll();
+        console.log("✅ Undo complete");
+
+        // Small delay to let Fabric.js finish
+        setTimeout(() => {
+          isUndoRedoRef.current = false;
+        }, 50);
+      });
+    } catch (error) {
+      console.error("❌ Undo error:", error);
+      isUndoRedoRef.current = false;
+      historyIndexRef.current++; // Restore index on error
+    }
+  }, []);
+
+  // ===== REDO FUNCTION =====
+  const redo = useCallback(() => {
+    const canvas = canvasInstance.current;
+
+    console.log("⏩ Redo called", {
+      hasCanvas: !!canvas,
+      currentIndex: historyIndexRef.current,
+      historyLength: historyRef.current.length,
+    });
+
+    if (!canvas) {
+      console.log("❌ No canvas");
+      return;
+    }
+
+    if (historyIndexRef.current >= historyRef.current.length - 1) {
+      console.log("❌ No more redo states (at end)");
+      return;
+    }
+
+    console.log(
+      "⏩ Redoing from index",
+      historyIndexRef.current,
+      "to",
+      historyIndexRef.current + 1
+    );
+
+    isUndoRedoRef.current = true;
+    historyIndexRef.current++;
+
+    const state = historyRef.current[historyIndexRef.current];
+
+    try {
+      const stateObj = JSON.parse(state);
+      console.log(
+        "📥 Loading state with",
+        stateObj.objects?.length || 0,
+        "objects"
+      );
+
+      canvas.loadFromJSON(stateObj, () => {
+        canvas.renderOnAddRemove = true;
+        canvas.requestRenderAll();
+        console.log("✅ Redo complete");
+
+        setTimeout(() => {
+          isUndoRedoRef.current = false;
+        }, 50);
+      });
+    } catch (error) {
+      console.error("❌ Redo error:", error);
+      isUndoRedoRef.current = false;
+      historyIndexRef.current--; // Restore index on error
+    }
+  }, []);
 
   function cleanupToolHandlers(canvas: fabric.Canvas) {
     const h = activeToolHandlersRef.current;
@@ -113,89 +292,6 @@ export function useFabricCanvas({
   }, []);
 
   // -----------------------------
-  // UNDO AND REDO FUNCTIONS
-  // -----------------------------
-  const undo = useCallback(() => {
-    const canvas = canvasInstance.current;
-    if (!canvas || historyIndexRef.current <= 0) return;
-
-    isUndoRedoRef.current = true;
-    historyIndexRef.current--;
-
-    const state = historyRef.current[historyIndexRef.current];
-    canvas.loadFromJSON(state, () => {
-      canvas.renderAll();
-      isUndoRedoRef.current = false;
-    });
-  }, []);
-
-  const redo = useCallback(() => {
-    const canvas = canvasInstance.current;
-    if (!canvas || historyIndexRef.current >= historyRef.current.length - 1)
-      return;
-
-    isUndoRedoRef.current = true;
-    historyIndexRef.current++;
-
-    const state = historyRef.current[historyIndexRef.current];
-    canvas.loadFromJSON(state, () => {
-      canvas.renderAll();
-      isUndoRedoRef.current = false;
-    });
-  }, []);
-
-  const saveHistory = useCallback(() => {
-    const canvas = canvasInstance.current;
-    if (!canvas || isUndoRedoRef.current) return;
-
-    const json = canvas.toJSON();
-    const state = JSON.stringify(json);
-
-    // Remove any redo states
-    historyRef.current = historyRef.current.slice(
-      0,
-      historyIndexRef.current + 1
-    );
-
-    // Add new state
-    historyRef.current.push(state);
-    historyIndexRef.current++;
-
-    // Limit history to 50 states
-    if (historyRef.current.length > 50) {
-      historyRef.current.shift();
-      historyIndexRef.current--;
-    }
-  }, []);
-
-  // Update the canvas event listeners to save history
-  useEffect(() => {
-    const canvas = canvasInstance.current;
-    if (!canvas) return;
-
-    const handleHistoryEvent = () => {
-      if (!isUndoRedoRef.current) {
-        saveHistory();
-      }
-    };
-
-    canvas.on("object:added", handleHistoryEvent);
-    canvas.on("object:modified", handleHistoryEvent);
-    canvas.on("object:removed", handleHistoryEvent);
-    canvas.on("path:created", handleHistoryEvent);
-
-    // save initial state
-    saveHistory();
-
-    return () => {
-      canvas.off("object:added", handleHistoryEvent);
-      canvas.off("object:modified", handleHistoryEvent);
-      canvas.off("object:removed", handleHistoryEvent);
-      canvas.off("path:created", handleHistoryEvent);
-    };
-  }, [saveHistory]);
-
-  // -----------------------------
   // THUMBNAIL GENERATION
   // -----------------------------
   const getThumbnail = useCallback((width = 300, height = 200) => {
@@ -241,6 +337,33 @@ export function useFabricCanvas({
       console.error("❌ Thumbnail generation error:", error);
       return "";
     }
+  }, []);
+
+  // -----------------------------
+  // CLEAR CANVAS
+  // -----------------------------
+  const clear = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    canvas.clear();
+
+    // Clear history
+    historyRef.current = [];
+    historyIndexRef.current = -1;
+
+    // Save empty state
+    setTimeout(() => {
+      console.log("Saving cleared canvas state");
+      saveHistory();
+    }, 100);
+  }, [saveHistory]);
+
+  // -----------------------------
+  // GET CANVAS INSTANCE
+  // -----------------------------
+  const getCanvas = useCallback(() => {
+    return canvasInstance.current;
   }, []);
 
   // -----------------------------
@@ -347,6 +470,10 @@ export function useFabricCanvas({
 
           e.path.setCoords();
           canvas.requestRenderAll();
+
+          setTimeout(() => {
+            saveHistory();
+          }, 0);
         };
 
         canvas.on("path:created", onPathCreated);
@@ -468,6 +595,10 @@ export function useFabricCanvas({
 
           canvas.discardActiveObject();
           canvas.requestRenderAll();
+
+          setTimeout(() => {
+            saveHistory();
+          }, 0);
         };
 
         canvas.on("mouse:down", onDown);
@@ -644,6 +775,11 @@ export function useFabricCanvas({
           isDrawingShapeRef.current = false;
           currentShapeRef.current = null;
           canvas?.requestRenderAll();
+
+          // Save History once
+          setTimeout(() => {
+            saveHistory();
+          }, 0);
         };
 
         canvas.on("mouse:down", onDown);
@@ -660,18 +796,67 @@ export function useFabricCanvas({
     [onToolChange]
   );
 
-  // -----------------------------
-  // CLEAR CANVAS
-  // -----------------------------
-  const clear = useCallback(() => {
-    canvasInstance.current?.clear();
+  // save canvas to JSON
+  const saveToJson = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return "";
+
+    // Get canvas JSON and filter out temporary objects
+    const canvasJSON = canvas.toJSON();
+
+    // Filter out objects marked as excludeFromExport
+    if (canvasJSON.objects) {
+      canvasJSON.objects = canvasJSON.objects.filter(
+        (obj: any) => !obj.excludeFromExport
+      );
+    }
+
+    return JSON.stringify(canvasJSON);
   }, []);
 
-  // -----------------------------
-  // GET CANVAS INSTANCE
-  // -----------------------------
-  const getCanvas = useCallback(() => {
-    return canvasInstance.current;
+  // Load canvas from JSON
+  const loadFromJson = useCallback((json: string) => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    console.log("Loading canvas from JSON, setting isUndoRedo=true");
+
+    // Don't save history during load
+    // isUndoRedoRef.current = true;
+
+    // Disable render during load
+    canvas.renderOnAddRemove = false;
+
+    canvas.loadFromJSON(json, () => {
+      canvas.renderOnAddRemove = true;
+      canvas.renderAll();
+      console.log("Canvas loaded from JSON");
+
+      // Reset history with loaded state
+      historyRef.current = [];
+      historyIndexRef.current = -1;
+
+      try {
+        const canvasJSON = canvas.toJSON();
+        if (canvasJSON.objects) {
+          canvasJSON.objects = canvasJSON.objects.filter(
+            (obj: any) => !obj.excludeFromExport
+          );
+        }
+        const state = JSON.stringify(canvasJSON);
+
+        historyRef.current.push(state);
+        historyIndexRef.current = 0;
+
+        console.log("💾 Initial state saved to history", {
+          index: historyIndexRef.current,
+          total: historyRef.current.length,
+          objectCount: canvasJSON.objects?.length || 0,
+        });
+      } catch (error) {
+        console.error("❌ Error saving initial state:", error);
+      }
+    });
   }, []);
 
   // -----------------------------
@@ -730,14 +915,47 @@ export function useFabricCanvas({
       fab.renderAll();
     });
 
+    console.log("Canvas initialized");
+
+    console.log("Setting up history event listeners");
+
+    const handleHistoryEvent = (e?: any) => {
+      console.log("Canvas event triggered:", e?.type || "unknown");
+
+      setTimeout(() => {
+        if (!isUndoRedoRef.current) {
+          console.log("Calling saveHistory from event");
+          saveHistory();
+        } else {
+          console.log("Skipping saveHistory (undo/redo in progress)");
+        }
+      }, 100);
+    };
+
+    fab.on("object:modified", handleHistoryEvent);
+    fab.on("object:removed", handleHistoryEvent);
+
+    console.log("✅ History listeners attached to canvas");
+
+    // Save initial empty state
+    setTimeout(() => {
+      console.log("💾 Saving initial canvas state");
+      saveHistory();
+    }, 300);
+
     return () => {
+      console.log("🧹 Disposing canvas");
+      fab.off("object:added", handleHistoryEvent);
+      fab.off("object:modified", handleHistoryEvent);
+      fab.off("object:removed", handleHistoryEvent);
+      fab.off("path:created", handleHistoryEvent);
       window.removeEventListener("resize", resize);
       fab.off("mouse:wheel");
       cleanupToolHandlers(fab);
       fab.dispose();
       canvasInstance.current = null;
     };
-  }, []);
+  }, [brushWidth, saveHistory]);
 
   // -----------------------------
   // UPDATE SETTINGS WHEN PROPS CHANGE
@@ -745,34 +963,6 @@ export function useFabricCanvas({
   useEffect(() => {
     applySettings({ color, brushWidth, tool });
   }, [color, brushWidth, tool, applySettings]);
-
-  // save canvas to JSON
-  const saveToJson = useCallback(() => {
-    const canvas = canvasInstance.current;
-    if (!canvas) return "";
-
-    // Get canvas JSON and filter out temporary objects
-    const canvasJSON = canvas.toJSON();
-
-    // Filter out objects marked as excludeFromExport
-    if (canvasJSON.objects) {
-      canvasJSON.objects = canvasJSON.objects.filter(
-        (obj: any) => !obj.excludeFromExport
-      );
-    }
-
-    return JSON.stringify(canvasJSON);
-  }, []);
-
-  // Load canvas from JSON
-  const loadFromJson = useCallback((json: string) => {
-    const canvas = canvasInstance.current;
-    if (!canvas) return;
-
-    canvas.loadFromJSON(json, () => {
-      canvas.renderAll();
-    });
-  }, []);
 
   return {
     canvasRef,
