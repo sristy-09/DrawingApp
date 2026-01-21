@@ -19,6 +19,37 @@ export function useBoard() {
   const isDrawingRef = useRef<boolean>(false); // Track if user is actively drawing
   const isSavingRef = useRef<boolean>(false); // Track if save is in progress
 
+   // Tools that have customization options
+  const toolsWithOptions: Tool[] = ["brush", "rect", "circle", "line"];
+
+  // Brush width presets
+  const brushWidths = [1, 2, 3, 5, 8, 12];
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showToolOptions, setShowToolOptions] = useState(false);
+  const toolOptionsRef = useRef<HTMLDivElement>(null)
+
+  const handleClear = () => {
+    clearCanvas();
+    setMenuOpen(false);
+  };
+
+  const handleSave = () => {
+    saveBoard();
+    setMenuOpen(false);
+  };
+
+  const handleToolChange = (newTool: Tool) => {
+    setTool(newTool);
+
+    // Show options for tools that support customization
+    if (toolsWithOptions.includes(newTool)) {
+      setShowToolOptions(true);
+    } else {
+      setShowToolOptions(false);
+    }
+  };
+
   const clearCanvas = () => canvasRef.current?.clear();
 
   const saveBoard = async (includeThumbnail = false) => {
@@ -215,6 +246,12 @@ export function useBoard() {
     canvasRef,
     color,
     brushWidth,
+    brushWidths,
+    menuOpen,
+    setMenuOpen,
+    showToolOptions,
+    setShowToolOptions,
+    toolOptionsRef,
     tool,
     setTool,
     setColor,
@@ -228,5 +265,9 @@ export function useBoard() {
     handleResetZoom,
     handleUndo,
     handleRedo,
+    handleClear,
+    handleSave,
+    handleToolChange,
+    toolsWithOptions,
   };
 }
