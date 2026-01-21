@@ -50,6 +50,9 @@ export interface FabricCanvasProps {
 export interface ToolbarProps {
   tool: Tool;
   setTool: (tool: Tool) => void;
+  handleToolChange: (tool: Tool)=> void;
+  toolsWithOptions: Tool[];
+  showToolOptions: boolean;
 }
 
 export type DockPosition = "top" | "right" | "bottom" | "left";

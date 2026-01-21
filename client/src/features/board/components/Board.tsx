@@ -1,16 +1,17 @@
-import Toolbar from "./Toolbar";
+import Toolbar, { toolIcons } from "./Toolbar";
 import FabricCanvas from "./FabricCanvas";
 import { useBoard } from "../hooks/useBoard";
 import {
   FaBars,
+  FaCheck,
   FaRedo,
   FaSearchMinus,
   FaSearchPlus,
   FaTimes,
   FaUndo,
 } from "react-icons/fa";
-import { useState } from "react";
-import type { Tool } from "../types/types";
+import { useEffect } from "react";
+import { useDragToolBar } from "../hooks/useDragToolBar";
 
 const Board: React.FC = () => {
   const {
@@ -18,11 +19,15 @@ const Board: React.FC = () => {
     setTool,
     brushWidth,
     setBrushWidth,
-    clearCanvas,
+    brushWidths,
+    menuOpen,
+    setMenuOpen,
+    showToolOptions,
+    setShowToolOptions,
+    toolOptionsRef,
     canvasRef,
     color,
     setColor,
-    saveBoard,
     saveStatus,
     zoom = 1,
     handleZoomIn,
@@ -30,23 +35,35 @@ const Board: React.FC = () => {
     handleResetZoom,
     handleUndo,
     handleRedo,
+    handleClear,
+    handleSave,
+    handleToolChange,
+    toolsWithOptions,
   } = useBoard();
 
-  const [menuOpen, setMenuOpen] = useState(false);
+  const { toolbarRef, getToolOptionsStyle } = useDragToolBar();
 
-  const handleClear = () => {
-    clearCanvas();
-    setMenuOpen(false);
-  };
+  // Close tool options when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        toolOptionsRef.current &&
+        !toolOptionsRef.current.contains(event.target as Node) &&
+        toolbarRef.current &&
+        !toolbarRef.current.contains(event.target as Node)
+      ) {
+        setShowToolOptions(false);
+      }
+    };
 
-  const handleSave = () => {
-    saveBoard();
-    setMenuOpen(false);
-  };
+    if (showToolOptions) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
 
-  const handleToolChange = (newTool: Tool) => {
-    setTool(newTool);
-  };
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showToolOptions]);
 
   // Predefined color palette
   const colorPalette = [
@@ -66,7 +83,13 @@ const Board: React.FC = () => {
 
   return (
     <div className="board-container h-screen w-screen overflow-hidden relative bg-gray-100">
-      <Toolbar tool={tool} setTool={setTool} />
+      <Toolbar
+        tool={tool}
+        setTool={setTool}
+        handleToolChange={handleToolChange}
+        toolsWithOptions={toolsWithOptions}
+        showToolOptions={showToolOptions}
+      />
 
       <FabricCanvas
         ref={canvasRef}
@@ -75,6 +98,177 @@ const Board: React.FC = () => {
         tool={tool}
         onToolChange={handleToolChange}
       />
+
+      {/* Tool Options Panel (Excalidraw-style) */}
+      {showToolOptions && toolsWithOptions.includes(tool) && (
+        <div
+          ref={toolOptionsRef}
+          style={getToolOptionsStyle()}
+          className="z-30 bg-white border-2 border-gray-300 rounded-xl shadow-xl p-4 min-w-[280px] max-w-[320px]"
+        >
+          {/* Header */}
+          <div className="mb-4 pb-3 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              {toolIcons[tool]}
+              <span className="capitalize">{tool} Options</span>
+            </h3>
+          </div>
+
+          {/* Stroke Color */}
+          <div className="mb-4">
+            <label className="text-xs font-medium text-gray-600 mb-2 block">
+              Stroke Color
+            </label>
+            <div className="grid grid-cols-5 gap-2">
+              {colorPalette.map((paletteColor) => (
+                <button
+                  key={paletteColor}
+                  onClick={() => setColor(paletteColor)}
+                  className={`w-10 h-10 rounded-lg border-2 transition-all relative ${
+                    color === paletteColor
+                      ? "border-blue-500 scale-110 shadow-md"
+                      : "border-gray-300 hover:scale-105"
+                  }`}
+                  style={{ backgroundColor: paletteColor }}
+                  title={paletteColor}
+                >
+                  {color === paletteColor && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <FaCheck
+                        className={`text-sm ${
+                          paletteColor === "#000000"
+                            ? "text-white"
+                            : "text-white"
+                        }`}
+                        style={{
+                          filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
+                        }}
+                      />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Color Picker */}
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-10 h-10 rounded-lg cursor-pointer border-2 border-gray-300"
+              />
+              <input
+                type="text"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm font-mono uppercase focus:outline-none focus:border-blue-500"
+                placeholder="#000000"
+                maxLength={7}
+              />
+            </div>
+          </div>
+
+          {/* Stroke Width */}
+          <div className="mb-4">
+            <label className="text-xs font-medium text-gray-600 mb-2 block">
+              Stroke Width
+            </label>
+            <div className="grid grid-cols-6 gap-2 mb-3">
+              {brushWidths.map((width) => (
+                <button
+                  key={width}
+                  onClick={() => setBrushWidth(width)}
+                  className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${
+                    brushWidth === width
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-300 hover:border-gray-400 bg-white"
+                  }`}
+                  title={`${width}px`}
+                >
+                  <div
+                    className="rounded-full bg-gray-700"
+                    style={{
+                      width: `${Math.min(width * 2, 16)}px`,
+                      height: `${Math.min(width * 2, 16)}px`,
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+
+            {/* Custom Width Slider */}
+            <div className="space-y-2">
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={brushWidth}
+                onChange={(e) => setBrushWidth(Number(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>1px</span>
+                <span className="font-semibold text-gray-700">
+                  {brushWidth}px
+                </span>
+                <span>20px</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <label className="text-xs font-medium text-gray-600 mb-2 block">
+              Preview
+            </label>
+            <div className="h-20 bg-gray-50 rounded-lg border-2 border-gray-200 flex items-center justify-center">
+              {tool === "rect" && (
+                <div
+                  className="rounded"
+                  style={{
+                    width: "60px",
+                    height: "40px",
+                    border: `${brushWidth}px solid ${color}`,
+                  }}
+                />
+              )}
+              {tool === "circle" && (
+                <div
+                  className="rounded-full"
+                  style={{
+                    width: "50px",
+                    height: "50px",
+                    border: `${brushWidth}px solid ${color}`,
+                  }}
+                />
+              )}
+              {tool === "line" && (
+                <div
+                  style={{
+                    width: "60px",
+                    height: `${brushWidth}px`,
+                    backgroundColor: color,
+                  }}
+                />
+              )}
+              {tool === "brush" && (
+                <div className="flex items-center gap-2">
+                  <div
+                    className="rounded-full"
+                    style={{
+                      width: `${Math.min(brushWidth * 3, 30)}px`,
+                      height: `${Math.min(brushWidth * 3, 30)}px`,
+                      backgroundColor: color,
+                    }}
+                  />
+                  <span className="text-xs text-gray-500">Brush stroke</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hamburger Menu Button - Top Left Corner */}
       <div className="fixed top-4 left-4 z-30">
@@ -206,8 +400,8 @@ const Board: React.FC = () => {
                 <div
                   className="rounded-full border-2 border-gray-300"
                   style={{
-                    width: `${brushWidth * 2}px`,
-                    height: `${brushWidth * 2}px`,
+                    width: "25px",
+                    height: `25px`,
                     backgroundColor: color,
                   }}
                 />

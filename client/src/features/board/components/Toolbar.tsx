@@ -12,7 +12,7 @@ import {
 import type { Tool, ToolbarProps } from "../types/types";
 import { useDragToolBar } from "../hooks/useDragToolBar";
 
-const toolIcons: Record<Tool, JSX.Element> = {
+export const toolIcons: Record<Tool, JSX.Element> = {
   select: <FaMousePointer />,
   brush: <FaPaintBrush />,
   eraser: <FaEraser />,
@@ -22,7 +22,13 @@ const toolIcons: Record<Tool, JSX.Element> = {
   line: <FaMinus />,
 };
 
-const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool }) => {
+const Toolbar: React.FC<ToolbarProps> = ({
+  tool,
+  setTool,
+  handleToolChange,
+  toolsWithOptions,
+  showToolOptions,
+}) => {
   const {
     toolbarRef,
     getToolbarStyle,
@@ -30,6 +36,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool }) => {
     isVertical,
     handleDragStart,
   } = useDragToolBar();
+
   return (
     <>
       {/* Draggable Tools Panel */}
@@ -58,11 +65,12 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool }) => {
           {/* Tool Buttons */}
           {Object.keys(toolIcons).map((key) => {
             const typedKey = key as Tool;
+            const hasOptions = toolsWithOptions.includes(typedKey);
             return (
               <button
                 key={typedKey}
-                onClick={() => setTool(typedKey)}
-                className={`px-1 py-1 rounded border transition-colors ${
+                onClick={() => handleToolChange(typedKey)}
+                className={`px-1 py-1 rounded border transition-colors relative ${
                   tool === typedKey
                     ? "bg-blue-500 text-white border-blue-500"
                     : "bg-white text-gray-700 border-gray-300 hover:bg-gray-200"
@@ -70,6 +78,11 @@ const Toolbar: React.FC<ToolbarProps> = ({ tool, setTool }) => {
                 title={typedKey.charAt(0).toUpperCase() + typedKey.slice(1)}
               >
                 {toolIcons[typedKey]}
+
+                {/* Active Indicator dot for tools with options */}
+                {hasOptions && tool === typedKey && showToolOptions && (
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full" />
+                )}
               </button>
             );
           })}
