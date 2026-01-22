@@ -11,7 +11,7 @@ export function useBoard() {
   const [brushWidth, setBrushWidth] = useState<number>(3);
   const [tool, setTool] = useState<Tool>("brush");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
-    "idle"
+    "idle",
   );
   const [zoom, setZoom] = useState<number>(1);
 
@@ -19,7 +19,13 @@ export function useBoard() {
   const isDrawingRef = useRef<boolean>(false); // Track if user is actively drawing
   const isSavingRef = useRef<boolean>(false); // Track if save is in progress
 
-   // Tools that have customization options
+  // Track the currently selected object
+  const selectedObjectRef = useRef<any>(null);
+
+  // Track the previous tool before auto-switching
+  const previousToolRef = useRef<Tool>(tool);
+
+  // Tools that have customization options
   const toolsWithOptions: Tool[] = ["brush", "rect", "circle", "line"];
 
   // Brush width presets
@@ -27,7 +33,7 @@ export function useBoard() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showToolOptions, setShowToolOptions] = useState(false);
-  const toolOptionsRef = useRef<HTMLDivElement>(null)
+  const toolOptionsRef = useRef<HTMLDivElement>(null);
 
   const handleClear = () => {
     clearCanvas();
@@ -40,17 +46,87 @@ export function useBoard() {
   };
 
   const handleToolChange = (newTool: Tool) => {
+    console.log(`🔧 Tool change: ${tool} → ${newTool}`);
+
+    // Store previous tool
+    previousToolRef.current = tool;
     setTool(newTool);
 
-    // Show options for tools that support customization
+    // If switching TO select tool from a drawing tool, keep popup open
+    if (
+      newTool === "select" &&
+      toolsWithOptions.includes(previousToolRef.current)
+    ) {
+      console.log("✅ Keeping popup open (auto-switched to select)");
+      // Don't change showToolOptions - keep it as is
+      return;
+    }
+
+    // If switching to a tool with options, show popup
     if (toolsWithOptions.includes(newTool)) {
+      console.log("✅ Showing popup for tool:", newTool);
       setShowToolOptions(true);
-    } else {
+    } else if (newTool !== "select") {
+      // Hide popup for tools without options (pan, eraser)
+      console.log("❌ Hiding popup for tool:", newTool);
       setShowToolOptions(false);
     }
   };
 
-  const clearCanvas = () => canvasRef.current?.clear();
+  // Modified color setter to updated selected object
+  const handleColorChange = (newColor: string) => {
+    console.log("Color change:", newColor);
+    setColor(newColor);
+
+    // Update the selected object if it exists
+    if (selectedObjectRef.current) {
+      const canvas = canvasRef.current?.getCanvas();
+      if (canvas) {
+        console.log("🎨 Updating selected object color");
+        selectedObjectRef.current.set({
+          stroke: newColor,
+        });
+        canvas.renderAll();
+
+        // Trigger save after modification
+        setTimeout(() => {
+          hasChangedRef.current = true;
+          debouncedSave();
+          debouncedThumbnailSave();
+        }, 100);
+      }
+    }
+  };
+
+  // Modified brush width setter to update selected object
+  const handleBrushWidthChange = (newWidth: number) => {
+    console.log("Brush width change:", newWidth);
+    setBrushWidth(newWidth);
+
+    // Update the selected object if it exists
+    if (selectedObjectRef.current) {
+      const canvas = canvasRef.current?.getCanvas();
+      if (canvas) {
+        console.log("🖌️ Updating selected object brush width");
+        selectedObjectRef.current.set({
+          strokeWidth: newWidth,
+        });
+        canvas.renderAll();
+
+        // Trigger save after modification
+        setTimeout(() => {
+          hasChangedRef.current = true;
+          debouncedSave();
+          debouncedThumbnailSave();
+        }, 100);
+      }
+    }
+  };
+
+  const clearCanvas = () => {
+    selectedObjectRef.current = null;
+    canvasRef.current?.clear();
+  };
 
   const saveBoard = async (includeThumbnail = false) => {
     if (!canvasRef.current || isSavingRef.current) return;
@@ -72,7 +148,7 @@ export function useBoard() {
     console.log(
       includeThumbnail
         ? "💾 Saving with thumbnail..."
-        : "💾 Saving without thumbnail..."
+        : "💾 Saving without thumbnail...",
     );
 
     isSavingRef.current = true;
@@ -97,7 +173,7 @@ export function useBoard() {
 
       const res = await axios.patch(
         `http://localhost:3000/board/${id}`,
-        payload
+        payload,
       );
 
       lastSavedDataRef.current = json;
@@ -124,7 +200,7 @@ export function useBoard() {
         saveBoard(false);
       }
     }, 2000),
-    [id]
+    [id],
   );
 
   // Debounced thumbnail generation (5 seconds) - only when not drawing
@@ -138,7 +214,7 @@ export function useBoard() {
         console.log("⏭️ No changes or user drawing - skipping thumbnail");
       }
     }, 5000),
-    [id]
+    [id],
   );
 
   const handleCanvasChange = () => {
@@ -190,9 +266,94 @@ export function useBoard() {
       }
     };
 
+    // Track when an object is selected
+    const handleSelectionCreated = (e: any) => {
+      if (e.selected && e.selected[0]) {
+        const obj = e.selected[0];
+        selectedObjectRef.current = obj;
+        console.log("Object selected:", obj.type);
+
+        // Update UI to show current object's properties
+        if (obj.stroke) {
+          setColor(obj.stroke);
+        }
+        if (obj.strokeWidth) {
+          setBrushWidth(obj.strokeWidth);
+        }
+
+        // Determine which tool this object belongs to and show its popup
+        let objectTool: Tool | null = null;
+        if (obj.type === "rect") {
+          objectTool = "rect";
+        } else if (obj.type === "circle") {
+          objectTool = "circle";
+        } else if (obj.type === "line") {
+          objectTool = "line";
+        } else if (obj.type === "path") {
+          objectTool = "brush";
+        }
+
+        if (objectTool && toolsWithOptions.includes(objectTool)) {
+          console.log("Switching tool to:", objectTool);
+          previousToolRef.current = tool;
+          setTool(objectTool);
+          setShowToolOptions(true);
+        }
+      }
+    };
+
+    // Track when selection is updated (when switching between objects)
+    const handleSelectionUpdated = (e: any) => {
+      if (e.selected && e.selected[0]) {
+        const obj = e.selected[0];
+        selectedObjectRef.current = obj;
+        console.log("Selection updated:", obj.type);
+
+        // Update UI to show current object's properties
+        if (obj.stroke) {
+          setColor(obj.stroke);
+        }
+        if (obj.strokeWidth) {
+          setBrushWidth(obj.strokeWidth);
+        }
+
+        // Determine which tool this object belongs to and show its popup
+        let objectTool: Tool | null = null;
+        if (obj.type === "rect") {
+          objectTool = "rect";
+        } else if (obj.type === "circle") {
+          objectTool = "circle";
+        } else if (obj.type === "line") {
+          objectTool = "line";
+        } else if (obj.type === "path") {
+          objectTool = "brush";
+        }
+
+        if (objectTool && toolsWithOptions.includes(objectTool)) {
+          console.log("Switching tool to:", objectTool);
+          previousToolRef.current = tool;
+          setTool(objectTool);
+          setShowToolOptions(true);
+        }
+      }
+    };
+
+    // Track when selection is cleared
+    const handleSelectionCleared = () => {
+      selectedObjectRef.current = null;
+      console.log("Selection cleared");
+      // Don't close popup when selection is cleared
+      // User might want to draw more shapes
+    };
+
     // Track drawing state
     canvas.on("mouse:down", handleMouseDown);
     canvas.on("mouse:up", handleMouseUp);
+
+    // Track selection changes
+    canvas.on("selection:created", handleSelectionCreated);
+    canvas.on("selection:updated", handleSelectionUpdated);
+    canvas.on("selection:cleared", handleSelectionCleared);
 
     // Track canvas changes
     canvas.on("object:modified", handleCanvasChange);
@@ -205,12 +366,15 @@ export function useBoard() {
       debouncedThumbnailSave.cancel();
       canvas.off("mouse:down", handleMouseDown);
       canvas.off("mouse:up", handleMouseUp);
+      canvas.off("selection:created", handleSelectionCreated);
+      canvas.off("selection:updated", handleSelectionUpdated);
+      canvas.off("selection:cleared", handleSelectionCleared);
       canvas.off("object:modified", handleCanvasChange);
       canvas.off("object:added", handleCanvasChange);
       canvas.off("path:created", handleCanvasChange);
       canvas.off("object:removed", handleCanvasChange);
     };
-  }, [debouncedSave, debouncedThumbnailSave]);
+  }, [debouncedSave, debouncedThumbnailSave, tool]);
 
   // When color/brushWidth/tool change, apply new settings
   useEffect(() => {
@@ -256,6 +420,8 @@ export function useBoard() {
     setTool,
     setColor,
     setBrushWidth,
+    handleColorChange,
+    handleBrushWidthChange,
     clearCanvas,
     saveBoard: () => saveBoard(false),
     saveStatus,
