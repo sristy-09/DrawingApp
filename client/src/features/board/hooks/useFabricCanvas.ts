@@ -62,7 +62,7 @@ export function useFabricCanvas({
       // Filter out temp objects
       if (json.objects) {
         json.objects = json.objects.filter(
-          (obj: any) => !obj.excludeFromExport
+          (obj: any) => !obj.excludeFromExport,
         );
       }
       const state = JSON.stringify(json);
@@ -78,7 +78,7 @@ export function useFabricCanvas({
       if (historyIndexRef.current < historyRef.current.length - 1) {
         historyRef.current = historyRef.current.slice(
           0,
-          historyIndexRef.current + 1
+          historyIndexRef.current + 1,
         );
       }
 
@@ -126,7 +126,7 @@ export function useFabricCanvas({
       "⏪ Undoing from index",
       historyIndexRef.current,
       "to",
-      historyIndexRef.current - 1
+      historyIndexRef.current - 1,
     );
 
     isUndoRedoRef.current = true;
@@ -139,7 +139,7 @@ export function useFabricCanvas({
       console.log(
         "📥 Loading state with",
         stateObj.objects?.length || 0,
-        "objects"
+        "objects",
       );
 
       canvas.loadFromJSON(stateObj, () => {
@@ -183,7 +183,7 @@ export function useFabricCanvas({
       "⏩ Redoing from index",
       historyIndexRef.current,
       "to",
-      historyIndexRef.current + 1
+      historyIndexRef.current + 1,
     );
 
     isUndoRedoRef.current = true;
@@ -196,7 +196,7 @@ export function useFabricCanvas({
       console.log(
         "📥 Loading state with",
         stateObj.objects?.length || 0,
-        "objects"
+        "objects",
       );
 
       canvas.loadFromJSON(stateObj, () => {
@@ -321,7 +321,7 @@ export function useFabricCanvas({
         quality: 0.8,
         multiplier: Math.min(
           width / canvas.getWidth(),
-          height / canvas.getHeight()
+          height / canvas.getHeight(),
         ),
       });
 
@@ -427,13 +427,23 @@ export function useFabricCanvas({
         canvas.hoverCursor = "default";
       }
 
-      // Make all objects selectable or not based on tool
+      /* ----------------------------------
+     OBJECT SELECTABILITY
+    ---------------------------------- */
+      // Make all objects selectable ONLY when in select mode
+      // OR when in a drawing tool mode (so we can see the active selection)
+      const shouldMakeSelectable =
+        _tool === "select" ||
+        _tool === "rect" ||
+        _tool === "circle" ||
+        _tool === "line";
+
       canvas.forEachObject((obj) => {
-        obj.selectable = _tool === "select";
-        obj.evented = _tool === "select";
-        obj.hoverCursor = _tool === "select" ? "move" : "default";
-        obj.hasControls = _tool === "select";
-        obj.hasBorders = _tool === "select";
+        obj.selectable = shouldMakeSelectable;
+        obj.evented = shouldMakeSelectable;
+        obj.hoverCursor = shouldMakeSelectable ? "move" : "default";
+        obj.hasControls = _tool === "select"; // Show controls only in select mode
+        obj.hasBorders = shouldMakeSelectable;
       });
 
       if (!canvas.freeDrawingBrush) {
@@ -446,8 +456,9 @@ export function useFabricCanvas({
         canvas.freeDrawingBrush.width = _width;
       }
 
-      // Discard active selection when switching away from select tool
-      if (_tool !== "select") {
+      // Don't discard active selection when switching between drawing tools
+      // Only discard when switching to non-selectable tools
+      if (_tool !== "select" && !shouldMakeSelectable) {
         canvas.discardActiveObject();
       }
 
@@ -465,7 +476,7 @@ export function useFabricCanvas({
             strokeUniform: true, // it tells fabric "Do NOT scale the stroke based on viewport zoom"
             objectCaching: false,
             selectable: true,
-            evented: false,
+            evented: true,
           });
 
           e.path.setCoords();
@@ -491,7 +502,7 @@ export function useFabricCanvas({
         const checkObjectIntersection = (
           obj: fabric.Object,
           cursorX: number,
-          cursorY: number
+          cursorY: number,
         ): boolean => {
           if (obj === eraserCircleRef.current) return false;
 
@@ -501,7 +512,7 @@ export function useFabricCanvas({
           const objBounds = obj.getBoundingRect();
           const distance = Math.sqrt(
             Math.pow(cursorX - (objBounds.left + objBounds.width / 2), 2) +
-              Math.pow(cursorY - (objBounds.top + objBounds.height / 2), 2)
+              Math.pow(cursorY - (objBounds.top + objBounds.height / 2), 2),
           );
 
           // Check if cursor circle intersects with object
@@ -556,7 +567,7 @@ export function useFabricCanvas({
             const isIntersecting = checkObjectIntersection(
               obj,
               pointer.x,
-              pointer.y
+              pointer.y,
             );
 
             if (isIntersecting) {
@@ -793,7 +804,7 @@ export function useFabricCanvas({
         };
       }
     },
-    [onToolChange]
+    [onToolChange, saveHistory],
   );
 
   // save canvas to JSON
@@ -807,7 +818,7 @@ export function useFabricCanvas({
     // Filter out objects marked as excludeFromExport
     if (canvasJSON.objects) {
       canvasJSON.objects = canvasJSON.objects.filter(
-        (obj: any) => !obj.excludeFromExport
+        (obj: any) => !obj.excludeFromExport,
       );
     }
 
@@ -840,7 +851,7 @@ export function useFabricCanvas({
         const canvasJSON = canvas.toJSON();
         if (canvasJSON.objects) {
           canvasJSON.objects = canvasJSON.objects.filter(
-            (obj: any) => !obj.excludeFromExport
+            (obj: any) => !obj.excludeFromExport,
           );
         }
         const state = JSON.stringify(canvasJSON);

@@ -10,6 +10,7 @@ export function useBoard() {
   const [color, setColor] = useState<string>("#000000");
   const [brushWidth, setBrushWidth] = useState<number>(3);
   const [tool, setTool] = useState<Tool>("brush");
+  const [activeDrawingTool, setActiveDrawingTool] = useState<Tool>("brush"); // Track which drawing tool is active
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
     "idle",
   );
@@ -21,9 +22,6 @@ export function useBoard() {
 
   // Track the currently selected object
   const selectedObjectRef = useRef<any>(null);
-
-  // Track the previous tool before auto-switching
-  const previousToolRef = useRef<Tool>(tool);
 
   // Tools that have customization options
   const toolsWithOptions: Tool[] = ["brush", "rect", "circle", "line"];
@@ -49,27 +47,22 @@ export function useBoard() {
     console.log(`🔧 Tool change: ${tool} → ${newTool}`);
 
     // Store previous tool
-    previousToolRef.current = tool;
     setTool(newTool);
 
-    // If switching TO select tool from a drawing tool, keep popup open
-    if (
-      newTool === "select" &&
-      toolsWithOptions.includes(previousToolRef.current)
-    ) {
-      console.log("✅ Keeping popup open (auto-switched to select)");
-      // Don't change showToolOptions - keep it as is
-      return;
-    }
-
-    // If switching to a tool with options, show popup
+    // If it's a drawing tool, remember it as the active drawing tool
     if (toolsWithOptions.includes(newTool)) {
-      console.log("✅ Showing popup for tool:", newTool);
+      setActiveDrawingTool(newTool);
       setShowToolOptions(true);
-    } else if (newTool !== "select") {
-      // Hide popup for tools without options (pan, eraser)
-      console.log("❌ Hiding popup for tool:", newTool);
+      console.log("showing popup for tool:", newTool);
+    } else if (newTool === "select") {
+      // When switching to select, keep the popup open if we have an active drawing tool
+      if (toolsWithOptions.includes(activeDrawingTool)) {
+        setShowToolOptions(true);
+        console.log("Keeping popup open for:", activeDrawingTool);
+      }
+    } else {
       setShowToolOptions(false);
+      (console.log("hiding popup"), newTool);
     }
   };
 
@@ -295,8 +288,7 @@ export function useBoard() {
 
         if (objectTool && toolsWithOptions.includes(objectTool)) {
           console.log("Switching tool to:", objectTool);
-          previousToolRef.current = tool;
-          setTool(objectTool);
+          setActiveDrawingTool(objectTool);
           setShowToolOptions(true);
         }
       }
@@ -331,8 +323,7 @@ export function useBoard() {
 
         if (objectTool && toolsWithOptions.includes(objectTool)) {
           console.log("Switching tool to:", objectTool);
-          previousToolRef.current = tool;
-          setTool(objectTool);
+          setActiveDrawingTool(objectTool);
           setShowToolOptions(true);
         }
       }
@@ -374,7 +365,7 @@ export function useBoard() {
       canvas.off("path:created", handleCanvasChange);
       canvas.off("object:removed", handleCanvasChange);
     };
-  }, [debouncedSave, debouncedThumbnailSave, tool]);
+  }, [debouncedSave, debouncedThumbnailSave, activeDrawingTool]);
 
   // When color/brushWidth/tool change, apply new settings
   useEffect(() => {
@@ -417,6 +408,7 @@ export function useBoard() {
     setShowToolOptions,
     toolOptionsRef,
     tool,
+    activeDrawingTool,
     setTool,
     setColor,
     setBrushWidth,

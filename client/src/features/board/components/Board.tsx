@@ -39,6 +39,7 @@ const Board: React.FC = () => {
     handleSave,
     handleToolChange,
     toolsWithOptions,
+    activeDrawingTool,
   } = useBoard();
 
   const { toolbarRef, getToolOptionsStyle } = useDragToolBar();
@@ -84,7 +85,7 @@ const Board: React.FC = () => {
   return (
     <div className="board-container h-screen w-screen overflow-hidden relative bg-gray-100">
       <Toolbar
-        tool={tool}
+        tool={activeDrawingTool}
         setTool={setTool}
         handleToolChange={handleToolChange}
         toolsWithOptions={toolsWithOptions}
@@ -100,7 +101,7 @@ const Board: React.FC = () => {
       />
 
       {/* Tool Options Panel (Excalidraw-style) */}
-      {showToolOptions && toolsWithOptions.includes(tool) && (
+      {showToolOptions && toolsWithOptions.includes(activeDrawingTool) && (
         <div
           ref={toolOptionsRef}
           style={getToolOptionsStyle()}
@@ -109,8 +110,8 @@ const Board: React.FC = () => {
           {/* Header */}
           <div className="mb-4 pb-3 border-b border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              {toolIcons[tool]}
-              <span className="capitalize">{tool} Options</span>
+              {toolIcons[activeDrawingTool]}
+              <span className="capitalize">{activeDrawingTool} Options</span>
             </h3>
           </div>
 
