@@ -23,7 +23,7 @@ export const toolIcons: Record<Tool, JSX.Element> = {
 };
 
 const Toolbar: React.FC<ToolbarProps> = ({
-  tool: activeDrawingTool,
+  tool,
   setTool,
   handleToolChange,
   toolsWithOptions,
@@ -71,7 +71,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 key={typedKey}
                 onClick={() => handleToolChange(typedKey)}
                 className={`px-1 py-1 rounded border transition-colors relative ${
-                  activeDrawingTool === typedKey
+                  tool === typedKey
                     ? "bg-blue-500 text-white border-blue-500"
                     : "bg-white text-gray-700 border-gray-300 hover:bg-gray-200"
                 }`}
@@ -80,11 +80,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 {toolIcons[typedKey]}
 
                 {/* Active Indicator dot for tools with options */}
-                {hasOptions &&
-                  activeDrawingTool === typedKey &&
-                  showToolOptions && (
-                    <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full" />
-                  )}
+                {hasOptions && tool === typedKey && showToolOptions && (
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full" />
+                )}
               </button>
             );
           })}

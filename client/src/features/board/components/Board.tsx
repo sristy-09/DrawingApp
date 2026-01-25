@@ -85,7 +85,7 @@ const Board: React.FC = () => {
   return (
     <div className="board-container h-screen w-screen overflow-hidden relative bg-gray-100">
       <Toolbar
-        tool={activeDrawingTool}
+        tool={tool}
         setTool={setTool}
         handleToolChange={handleToolChange}
         toolsWithOptions={toolsWithOptions}
@@ -197,76 +197,72 @@ const Board: React.FC = () => {
                 </button>
               ))}
             </div>
+          </div>
 
-            {/* Custom Width Slider */}
-            <div className="space-y-2">
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={brushWidth}
-                onChange={(e) => setBrushWidth(Number(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>1px</span>
-                <span className="font-semibold text-gray-700">
-                  {brushWidth}px
-                </span>
-                <span>20px</span>
-              </div>
+          {/* Undo/Redo Buttons */}
+          <div className="mb-4">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleUndo}
+                className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center space-x-2"
+                title="Undo"
+              >
+                <FaUndo className="w-4 h-4" />
+                <span>Undo</span>
+              </button>
+
+              <button
+                onClick={handleRedo}
+                className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center space-x-2"
+                title="Redo"
+              >
+                <FaRedo className="w-4 h-4" />
+                <span>Redo</span>
+              </button>
             </div>
           </div>
 
-          {/* Preview */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <label className="text-xs font-medium text-gray-600 mb-2 block">
-              Preview
-            </label>
-            <div className="h-20 bg-gray-50 rounded-lg border-2 border-gray-200 flex items-center justify-center">
-              {tool === "rect" && (
-                <div
-                  className="rounded"
-                  style={{
-                    width: "60px",
-                    height: "40px",
-                    border: `${brushWidth}px solid ${color}`,
-                  }}
+          {/* Action Buttons */}
+          <div className="mb-4 flex items-center justify-center space-x-2">
+            <button
+              onClick={handleClear}
+              className="px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center justify-center space-x-2"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                 />
-              )}
-              {tool === "circle" && (
-                <div
-                  className="rounded-full"
-                  style={{
-                    width: "50px",
-                    height: "50px",
-                    border: `${brushWidth}px solid ${color}`,
-                  }}
+              </svg>
+              <span>Clear Canvas</span>
+            </button>
+
+            <button
+              onClick={handleSave}
+              className="px-2 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium flex items-center justify-center space-x-2"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
                 />
-              )}
-              {tool === "line" && (
-                <div
-                  style={{
-                    width: "60px",
-                    height: `${brushWidth}px`,
-                    backgroundColor: color,
-                  }}
-                />
-              )}
-              {tool === "brush" && (
-                <div className="flex items-center gap-2">
-                  <div
-                    className="rounded-full"
-                    style={{
-                      width: `${Math.min(brushWidth * 3, 30)}px`,
-                      height: `${Math.min(brushWidth * 3, 30)}px`,
-                      backgroundColor: color,
-                    }}
-                  />
-                  <span className="text-xs text-gray-500">Brush stroke</span>
-                </div>
-              )}
-            </div>
+              </svg>
+              <span>Save Now</span>
+            </button>
           </div>
         </div>
       )}

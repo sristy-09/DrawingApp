@@ -11,7 +11,7 @@ export function useFabricCanvas({
   color: string;
   brushWidth: number;
   tool: Tool;
-  onToolChange?: (tool: Tool) => void; // Optional callback to update tool state
+  onToolChange?: (tool: Tool) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasInstance = useRef<fabric.Canvas | null>(null);
@@ -26,7 +26,6 @@ export function useFabricCanvas({
     extra?: any;
   }>({});
 
-  // Track current shape being drawn and eraser state
   const currentShapeRef = useRef<fabric.Object | null>(null);
   const isDrawingShapeRef = useRef<boolean>(false);
   const eraserCircleRef = useRef<fabric.Circle | null>(null);
@@ -53,13 +52,12 @@ export function useFabricCanvas({
     }
 
     if (isUndoRedoRef.current) {
-      console.log("❌ Undo/redo in progress, skipping");
+      console.log("❌ Undo/redo or loading in progress, skipping");
       return;
     }
 
     try {
       const json = canvas.toJSON();
-      // Filter out temp objects
       if (json.objects) {
         json.objects = json.objects.filter(
           (obj: any) => !obj.excludeFromExport,
@@ -67,14 +65,12 @@ export function useFabricCanvas({
       }
       const state = JSON.stringify(json);
 
-      // Don't save if state hasn't changed
       const lastState = historyRef.current[historyIndexRef.current];
       if (lastState === state) {
         console.log("⏭️ State unchanged, skipping");
         return;
       }
 
-      // Remove any redo states
       if (historyIndexRef.current < historyRef.current.length - 1) {
         historyRef.current = historyRef.current.slice(
           0,
@@ -82,7 +78,6 @@ export function useFabricCanvas({
         );
       }
 
-      // Add new state
       historyRef.current.push(state);
       historyIndexRef.current++;
 
@@ -92,7 +87,6 @@ export function useFabricCanvas({
         objectCount: json.objects?.length || 0,
       });
 
-      // Limit history to 50 states
       if (historyRef.current.length > 50) {
         historyRef.current.shift();
         historyIndexRef.current--;
@@ -102,7 +96,6 @@ export function useFabricCanvas({
     }
   }, []);
 
-  // ===== UNDO FUNCTION =====
   const undo = useCallback(() => {
     const canvas = canvasInstance.current;
 
@@ -147,19 +140,15 @@ export function useFabricCanvas({
         canvas.requestRenderAll();
         console.log("✅ Undo complete");
 
-        // Small delay to let Fabric.js finish
-        setTimeout(() => {
-          isUndoRedoRef.current = false;
-        }, 50);
+        isUndoRedoRef.current = false;
       });
     } catch (error) {
       console.error("❌ Undo error:", error);
       isUndoRedoRef.current = false;
-      historyIndexRef.current++; // Restore index on error
+      historyIndexRef.current++;
     }
   }, []);
 
-  // ===== REDO FUNCTION =====
   const redo = useCallback(() => {
     const canvas = canvasInstance.current;
 
@@ -204,14 +193,12 @@ export function useFabricCanvas({
         canvas.requestRenderAll();
         console.log("✅ Redo complete");
 
-        setTimeout(() => {
-          isUndoRedoRef.current = false;
-        }, 50);
+        isUndoRedoRef.current = false;
       });
     } catch (error) {
       console.error("❌ Redo error:", error);
       isUndoRedoRef.current = false;
-      historyIndexRef.current--; // Restore index on error
+      historyIndexRef.current--;
     }
   }, []);
 
@@ -224,14 +211,12 @@ export function useFabricCanvas({
     if (h.extra) canvas.off("path:created", h.extra);
     activeToolHandlersRef.current = {};
 
-    // Clean up any leftover shape
     if (currentShapeRef.current) {
       canvas.remove(currentShapeRef.current);
       currentShapeRef.current = null;
     }
     isDrawingShapeRef.current = false;
 
-    // Cleanup any leftover eraser circle
     if (eraserCircleRef.current) {
       canvas.remove(eraserCircleRef.current);
       eraserCircleRef.current = null;
@@ -239,15 +224,12 @@ export function useFabricCanvas({
     isErasingRef.current = false;
   }
 
-  // -----------------------------
-  // ZOOM FUNCTIONS
-  // -----------------------------
   const zoomIn = useCallback(() => {
     const canvas = canvasInstance.current;
     if (!canvas) return;
 
     const currentZoom = canvas.getZoom();
-    const newZoom = Math.min(currentZoom * 1.1, 5); // Max 5x zoom
+    const newZoom = Math.min(currentZoom * 1.1, 5);
     canvas.setZoom(newZoom);
 
     if (canvas?.isDrawingMode && canvas.freeDrawingBrush) {
@@ -262,7 +244,7 @@ export function useFabricCanvas({
     if (!canvas) return;
 
     const currentZoom = canvas.getZoom();
-    const newZoom = Math.max(currentZoom / 1.1, 0.1); // Min 0.1x zoom
+    const newZoom = Math.max(currentZoom / 1.1, 0.1);
     canvas.setZoom(newZoom);
 
     if (canvas?.isDrawingMode && canvas.freeDrawingBrush) {
@@ -291,31 +273,24 @@ export function useFabricCanvas({
     return canvas ? canvas.getZoom() : 1;
   }, []);
 
-  // -----------------------------
-  // THUMBNAIL GENERATION
-  // -----------------------------
   const getThumbnail = useCallback((width = 300, height = 200) => {
     const canvas = canvasInstance.current;
     if (!canvas) return "";
 
-    // Don't generate thumbnail while user is drawing
     if (isDrawingShapeRef.current || isErasingRef.current) {
       return "";
     }
 
     try {
-      // Store current zoom and viewport
       const currentZoom = canvas.getZoom();
       const currentVPT = canvas.viewportTransform?.slice() as
         | fabric.TMat2D
         | undefined;
 
-      // Reset zoom and viewport for thumbnail
       canvas.setZoom(1);
       canvas.viewportTransform = [1, 0, 0, 1, 0, 0];
       canvas.renderAll();
 
-      // Generate thumbnail as data URL
       const dataURL = canvas.toDataURL({
         format: "png",
         quality: 0.8,
@@ -325,7 +300,6 @@ export function useFabricCanvas({
         ),
       });
 
-      // Restore zoom and viewport
       canvas.setZoom(currentZoom);
       if (currentVPT) {
         canvas.viewportTransform = currentVPT;
@@ -339,36 +313,25 @@ export function useFabricCanvas({
     }
   }, []);
 
-  // -----------------------------
-  // CLEAR CANVAS
-  // -----------------------------
   const clear = useCallback(() => {
     const canvas = canvasInstance.current;
     if (!canvas) return;
 
     canvas.clear();
 
-    // Clear history
     historyRef.current = [];
     historyIndexRef.current = -1;
 
-    // Save empty state
     setTimeout(() => {
       console.log("Saving cleared canvas state");
       saveHistory();
     }, 100);
   }, [saveHistory]);
 
-  // -----------------------------
-  // GET CANVAS INSTANCE
-  // -----------------------------
   const getCanvas = useCallback(() => {
     return canvasInstance.current;
   }, []);
 
-  // -----------------------------
-  // APPLY SETTINGS
-  // -----------------------------
   const applySettings = useCallback(
     ({
       color: _color,
@@ -382,34 +345,20 @@ export function useFabricCanvas({
       const canvas = canvasInstance.current;
       if (!canvas) return;
 
-      /* ----------------------------------
-       CLEANUP PREVIOUS TOOL
-      ---------------------------------- */
       cleanupToolHandlers(canvas);
 
-      // Restore any faded objects(eraser safety)
       canvas.forEachObject((obj) => {
         if (obj.opacity !== 1) {
           obj.set({ opacity: 1 });
         }
       });
 
-      // Clear top context (eraser cursor)
       canvas.contextTop?.clearRect(0, 0, canvas.width!, canvas.height!);
-
-      // Reset panning
       isPanningRef.current = false;
 
-      /* ----------------------------------
-       BASE CANVAS STATE
-      ---------------------------------- */
       canvas.isDrawingMode = _tool === "brush";
       canvas.selection = _tool === "select";
 
-      /* ----------------------------------
-       CURSORS
-      ---------------------------------- */
-      // Set cursor based on tool - FIXED: Always show crosshair for drawing tools
       if (_tool === "pan") {
         canvas.defaultCursor = "grab";
         canvas.hoverCursor = "grab";
@@ -427,11 +376,6 @@ export function useFabricCanvas({
         canvas.hoverCursor = "default";
       }
 
-      /* ----------------------------------
-     OBJECT SELECTABILITY
-    ---------------------------------- */
-      // Make all objects selectable ONLY when in select mode
-      // OR when in a drawing tool mode (so we can see the active selection)
       const shouldMakeSelectable =
         _tool === "select" ||
         _tool === "rect" ||
@@ -442,7 +386,7 @@ export function useFabricCanvas({
         obj.selectable = shouldMakeSelectable;
         obj.evented = shouldMakeSelectable;
         obj.hoverCursor = shouldMakeSelectable ? "move" : "default";
-        obj.hasControls = _tool === "select"; // Show controls only in select mode
+        obj.hasControls = _tool === "select";
         obj.hasBorders = shouldMakeSelectable;
       });
 
@@ -450,30 +394,24 @@ export function useFabricCanvas({
         canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
       }
 
-      // Configure brush for drawing
       if (_tool === "brush") {
         canvas.freeDrawingBrush.color = _color;
         canvas.freeDrawingBrush.width = _width;
       }
 
-      // Don't discard active selection when switching between drawing tools
-      // Only discard when switching to non-selectable tools
       if (_tool !== "select" && !shouldMakeSelectable) {
         canvas.discardActiveObject();
       }
 
       canvas.renderAll();
 
-      /* ----------------------------------
-       BRUSH TOOL
-      ---------------------------------- */
-      // Handle brush drawing
+      // BRUSH TOOL
       if (_tool === "brush") {
         const onPathCreated = (e: any) => {
           if (!e.path) return;
 
           e.path.set({
-            strokeUniform: true, // it tells fabric "Do NOT scale the stroke based on viewport zoom"
+            strokeUniform: true,
             objectCaching: false,
             selectable: true,
             evented: true,
@@ -484,20 +422,17 @@ export function useFabricCanvas({
 
           setTimeout(() => {
             saveHistory();
-          }, 0);
+          }, 50);
         };
 
         canvas.on("path:created", onPathCreated);
         activeToolHandlersRef.current.extra = onPathCreated;
       }
 
-      /* ----------------------------------
-       ERASER TOOL
-      ---------------------------------- */
-      // Handle eraser - drag to select and preview deletion
+      // ERASER TOOL
       if (_tool === "eraser") {
         let touchedObjects = new Set<fabric.Object>();
-        const eraserRadius = _width * 3; // Eraser size
+        const eraserRadius = _width * 3;
 
         const checkObjectIntersection = (
           obj: fabric.Object,
@@ -505,8 +440,6 @@ export function useFabricCanvas({
           cursorY: number,
         ): boolean => {
           if (obj === eraserCircleRef.current) return false;
-
-          // Ignore objects marked as excludeFromExport (temp objects)
           if ((obj as any).excludeFromExport) return false;
 
           const objBounds = obj.getBoundingRect();
@@ -515,7 +448,6 @@ export function useFabricCanvas({
               Math.pow(cursorY - (objBounds.top + objBounds.height / 2), 2),
           );
 
-          // Check if cursor circle intersects with object
           return (
             distance <
             eraserRadius + Math.max(objBounds.width, objBounds.height) / 2
@@ -527,7 +459,6 @@ export function useFabricCanvas({
           touchedObjects.clear();
           const pointer = canvas.getPointer(e.e);
 
-          // Create eraser circle cursor
           eraserCircleRef.current = new fabric.Circle({
             left: pointer.x,
             top: pointer.y,
@@ -553,13 +484,11 @@ export function useFabricCanvas({
 
           const pointer = canvas.getPointer(e.e);
 
-          // Move eraser circle with cursor
           eraserCircleRef.current.set({
             left: pointer.x,
             top: pointer.y,
           });
 
-          // Check intersection with all objects
           canvas.forEachObject((obj) => {
             if (obj === eraserCircleRef.current) return;
             if ((obj as any).excludeFromExport) return;
@@ -573,11 +502,11 @@ export function useFabricCanvas({
             if (isIntersecting) {
               if (!touchedObjects.has(obj)) {
                 touchedObjects.add(obj);
-                obj.set({ opacity: 0.3 }); // Preview deletion
+                obj.set({ opacity: 0.3 });
               }
             } else {
               if (touchedObjects.has(obj)) {
-                obj.set({ opacity: 1 }); // Restore opacity
+                obj.set({ opacity: 1 });
                 touchedObjects.delete(obj);
               }
             }
@@ -591,14 +520,12 @@ export function useFabricCanvas({
 
           isErasingRef.current = false;
 
-          // Delete all touched objects
           touchedObjects.forEach((obj) => {
             obj.set({ opacity: 1 });
             canvas.remove(obj);
           });
           touchedObjects.clear();
 
-          // Remove the eraser circle
           if (eraserCircleRef.current) {
             canvas.remove(eraserCircleRef.current);
             eraserCircleRef.current = null;
@@ -609,7 +536,7 @@ export function useFabricCanvas({
 
           setTimeout(() => {
             saveHistory();
-          }, 0);
+          }, 50);
         };
 
         canvas.on("mouse:down", onDown);
@@ -623,10 +550,7 @@ export function useFabricCanvas({
         };
       }
 
-      /* ----------------------------------
-       PAN TOOL
-      ---------------------------------- */
-      // Handle pan tool
+      // PAN TOOL
       if (_tool === "pan") {
         const onDown = (e: any) => {
           const evt = e.e as MouseEvent | PointerEvent;
@@ -667,10 +591,7 @@ export function useFabricCanvas({
         };
       }
 
-      /* ----------------------------------
-       SHAPE TOOLS
-      ---------------------------------- */
-      // Handle shape drawing tools
+      // SHAPE TOOLS
       if (
         _tool !== "brush" &&
         _tool !== "eraser" &&
@@ -762,7 +683,6 @@ export function useFabricCanvas({
           if (currentShapeRef.current && isDrawingShapeRef.current) {
             const shape = currentShapeRef.current;
 
-            // Make shape selectable and movable
             shape.set({
               selectable: true,
               evented: true,
@@ -771,12 +691,10 @@ export function useFabricCanvas({
             });
             shape.setCoords();
 
-            // Set the newly created shape as active object to show selection
             canvas.discardActiveObject();
             canvas.setActiveObject(shape);
             canvas.renderAll();
 
-            // Auto-switch to select tool after drawing shape
             if (onToolChange) {
               setTimeout(() => {
                 onToolChange("select");
@@ -787,10 +705,9 @@ export function useFabricCanvas({
           currentShapeRef.current = null;
           canvas?.requestRenderAll();
 
-          // Save History once
           setTimeout(() => {
             saveHistory();
-          }, 0);
+          }, 50);
         };
 
         canvas.on("mouse:down", onDown);
@@ -807,15 +724,12 @@ export function useFabricCanvas({
     [onToolChange, saveHistory],
   );
 
-  // save canvas to JSON
   const saveToJson = useCallback(() => {
     const canvas = canvasInstance.current;
     if (!canvas) return "";
 
-    // Get canvas JSON and filter out temporary objects
     const canvasJSON = canvas.toJSON();
 
-    // Filter out objects marked as excludeFromExport
     if (canvasJSON.objects) {
       canvasJSON.objects = canvasJSON.objects.filter(
         (obj: any) => !obj.excludeFromExport,
@@ -825,17 +739,12 @@ export function useFabricCanvas({
     return JSON.stringify(canvasJSON);
   }, []);
 
-  // Load canvas from JSON
   const loadFromJson = useCallback((json: string) => {
     const canvas = canvasInstance.current;
     if (!canvas) return;
 
-    console.log("Loading canvas from JSON, setting isUndoRedo=true");
+    console.log("Loading canvas from JSON");
 
-    // Don't save history during load
-    // isUndoRedoRef.current = true;
-
-    // Disable render during load
     canvas.renderOnAddRemove = false;
 
     canvas.loadFromJSON(json, () => {
@@ -843,7 +752,6 @@ export function useFabricCanvas({
       canvas.renderAll();
       console.log("Canvas loaded from JSON");
 
-      // Reset history with loaded state
       historyRef.current = [];
       historyIndexRef.current = -1;
 
@@ -870,9 +778,7 @@ export function useFabricCanvas({
     });
   }, []);
 
-  // -----------------------------
-  // MOUNT / UNMOUNT (ONLY ONCE)
-  // -----------------------------
+  // MOUNT / UNMOUNT - REMOVE brushWidth from dependencies!
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
@@ -896,7 +802,6 @@ export function useFabricCanvas({
     resize();
     window.addEventListener("resize", resize);
 
-    // Use Fabric.js built-in mouse:wheel event for zoom
     fab.on("mouse:wheel", (opt) => {
       const e = opt.e as WheelEvent;
       e.preventDefault();
@@ -905,18 +810,14 @@ export function useFabricCanvas({
       const delta = e.deltaY;
       let zoom = fab.getZoom();
 
-      // Apply zoom - scroll up (negative delta) = zoom in, scroll down (positive delta) = zoom out
       let newZoom: number;
       if (delta < 0) {
-        newZoom = zoom * 1.05; // Zoom in
+        newZoom = zoom * 1.05;
       } else {
-        newZoom = zoom * 0.95; // Zoom out
+        newZoom = zoom * 0.95;
       }
 
-      // Clamp zoom between 0.1x and 5x
       newZoom = Math.max(0.1, Math.min(5, newZoom));
-
-      // Zoom at cursor position
       fab.zoomToPoint(new fabric.Point(e.offsetX, e.offsetY), newZoom);
 
       if (fab.isDrawingMode && fab.freeDrawingBrush) {
@@ -927,7 +828,6 @@ export function useFabricCanvas({
     });
 
     console.log("Canvas initialized");
-
     console.log("Setting up history event listeners");
 
     const handleHistoryEvent = (e?: any) => {
@@ -938,17 +838,17 @@ export function useFabricCanvas({
           console.log("Calling saveHistory from event");
           saveHistory();
         } else {
-          console.log("Skipping saveHistory (undo/redo in progress)");
+          console.log("Skipping saveHistory (undo/redo/loading in progress)");
         }
-      }, 100);
+      }, 50);
     };
 
+    fab.on("object:added", handleHistoryEvent);
     fab.on("object:modified", handleHistoryEvent);
     fab.on("object:removed", handleHistoryEvent);
 
     console.log("✅ History listeners attached to canvas");
 
-    // Save initial empty state
     setTimeout(() => {
       console.log("💾 Saving initial canvas state");
       saveHistory();
@@ -966,11 +866,9 @@ export function useFabricCanvas({
       fab.dispose();
       canvasInstance.current = null;
     };
-  }, [brushWidth, saveHistory]);
+  }, [saveHistory]); // REMOVED brushWidth from here!
 
-  // -----------------------------
   // UPDATE SETTINGS WHEN PROPS CHANGE
-  // -----------------------------
   useEffect(() => {
     applySettings({ color, brushWidth, tool });
   }, [color, brushWidth, tool, applySettings]);

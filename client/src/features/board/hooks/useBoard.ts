@@ -16,6 +16,9 @@ export function useBoard() {
   );
   const [zoom, setZoom] = useState<number>(1);
 
+  // Track if canvas has actually changed
+  const hasChangedRef = useRef(false);
+
   const lastSavedDataRef = useRef<string>("");
   const isDrawingRef = useRef<boolean>(false); // Track if user is actively drawing
   const isSavingRef = useRef<boolean>(false); // Track if save is in progress
@@ -59,8 +62,11 @@ export function useBoard() {
       if (toolsWithOptions.includes(activeDrawingTool)) {
         setShowToolOptions(true);
         console.log("Keeping popup open for:", activeDrawingTool);
+      } else {
+        setShowToolOptions(false);
       }
     } else {
+      // For eraser, pan, or other tools
       setShowToolOptions(false);
       (console.log("hiding popup"), newTool);
     }
@@ -79,13 +85,14 @@ export function useBoard() {
         selectedObjectRef.current.set({
           stroke: newColor,
         });
+        selectedObjectRef.current.setCoords();
+        canvas.fire("object:modified", { target: selectedObjectRef.current });
         canvas.renderAll();
 
-        // Trigger save after modification
+        // Wait longer and only save to history, not to backend
         setTimeout(() => {
+          // Only mark as changed, don't trigger backend save immediately
           hasChangedRef.current = true;
-          debouncedSave();
-          debouncedThumbnailSave();
         }, 100);
       }
     }
@@ -104,13 +111,14 @@ export function useBoard() {
         selectedObjectRef.current.set({
           strokeWidth: newWidth,
         });
+        selectedObjectRef.current.setCoords(); // IMPORTANT: Update coordinates
+        canvas.fire("object:modified", { target: selectedObjectRef.current });
         canvas.renderAll();
 
-        // Trigger save after modification
+        // Wait longer and only save to history, not to backend
         setTimeout(() => {
+          // Only mark as changed, don't trigger backend save immediately
           hasChangedRef.current = true;
-          debouncedSave();
-          debouncedThumbnailSave();
         }, 100);
       }
     }
@@ -182,9 +190,6 @@ export function useBoard() {
       isSavingRef.current = false;
     }
   };
-
-  // Track if canvas has actually changed
-  const hasChangedRef = useRef(false);
 
   // Create debounced save function - only save when not drawing
   const debouncedSave = useCallback(
@@ -407,13 +412,11 @@ export function useBoard() {
     showToolOptions,
     setShowToolOptions,
     toolOptionsRef,
-    tool,
-    activeDrawingTool,
+    tool, // Current active tool (for toolbar highlight)
+    activeDrawingTool, // Last drawing tool (for popup content)
     setTool,
-    setColor,
-    setBrushWidth,
-    handleColorChange,
-    handleBrushWidthChange,
+    setColor: handleColorChange,
+    setBrushWidth: handleBrushWidthChange,
     clearCanvas,
     saveBoard: () => saveBoard(false),
     saveStatus,
