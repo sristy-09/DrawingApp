@@ -5,7 +5,7 @@ export function useDragToolBar() {
   // Draggable toolbar state
   const [dockPosition, setDockPosition] = useState<DockPosition>("right");
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [, setDragStart] = useState({ x: 0, y: 0 });
   const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 });
   const toolbarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -128,43 +128,41 @@ export function useDragToolBar() {
       transition: "all 0.3s ease",
     };
 
-    switch (dockPosition) {
-      case "top":
-        // When toolbar is at top, show popup on left side
-        return {
-          ...baseStyle,
-          top: "80px",
-          left: "16px",
-          transform: "translateX(-50%)", // used when centering horizontally
-        };
+    // POPUP ALWAYS LEFT except when toolbar is on LEFT
+    const popupSide = dockPosition === "left" ? "right" : "left";
 
-      case "bottom":
-        // When toolbar is at bottom, show popup above it
-        return {
-          ...baseStyle,
-          bottom: "80px",
-          left: "16px",
-          transform: "translateX(-50%)",
-        };
-
-      case "left":
-        // When toolbar is at left, show popup to the right(opposite side)
-        return {
-          ...baseStyle,
-          left: "90px",
-          top: "50%",
-          transform: "translateY(-50%)", // used when centering vertically
-        };
-
-      case "right":
-        return {
-          // when toolbar is at right, show popup to the left(opposite side)
-          ...baseStyle,
-          right: "calc(16px + 80px + 16px)", // right margin + toolbar width (approx) + gap
-          top: "50%",
-          transform: "translateY(-50%)",
-        };
+    if (dockPosition === "top") {
+      return {
+        ...baseStyle,
+        left: "16px",
+        top: "96px",
+      };
     }
+
+    if (dockPosition === "bottom") {
+      return {
+        ...baseStyle,
+        left: "16px",
+        bottom: "96px",
+      };
+    }
+
+    if (popupSide === "right") {
+      return {
+        ...baseStyle,
+        right: "16px",
+        top: "50%",
+        transform: "translateY(-50%)",
+      };
+    }
+
+    // popupSide === "left"
+    return {
+      ...baseStyle,
+      left: "16px",
+      top: "50%",
+      transform: "translateY(-50%)",
+    };
   };
 
   const isVertical = dockPosition === "left" || dockPosition === "right";

@@ -23,10 +23,11 @@ export function useUserDashboard() {
   });
 
   const [showNewBoardForm, setShowNewBoardForm] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const fetchBoards = async () => {
     try {
-      const response = await axios.get<Board[]>("http://localhost:3000/board", {
+      const response = await axios.get<Board[]>(`${API_URL}/board`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setBoards(response.data ?? []);
@@ -39,7 +40,7 @@ export function useUserDashboard() {
   const createBoard = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      await axios.post("http://localhost:3000/board", newBoard, {
+      await axios.post(`${API_URL}/board`, newBoard, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },

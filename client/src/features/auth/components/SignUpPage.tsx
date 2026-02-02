@@ -16,6 +16,7 @@ import { Link } from "react-router";
 
 function SignUpPage() {
   const { handleSubmit, myForm, handleChange, loading, errors } = useSignup();
+  const API_URL = import.meta.env.VITE_API_URL;
 
   return (
     <div className="flex justify-center items-center mt-40">
@@ -95,9 +96,7 @@ function SignUpPage() {
         </CardContent>
         <CardFooter className="flex-col gap-2">
           <Button
-            onClick={() =>
-              window.open("http://localhost:3000/auth/google", "_self")
-            }
+            onClick={() => window.open(`${API_URL}/auth/google`, "_self")}
             variant="outline"
             className="w-full"
             disabled={loading}

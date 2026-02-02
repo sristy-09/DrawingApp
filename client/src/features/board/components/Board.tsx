@@ -2,16 +2,16 @@ import Toolbar, { toolIcons } from "./Toolbar";
 import FabricCanvas from "./FabricCanvas";
 import { useBoard } from "../hooks/useBoard";
 import {
-  FaBars,
   FaCheck,
+  FaHome,
   FaRedo,
   FaSearchMinus,
   FaSearchPlus,
-  FaTimes,
   FaUndo,
 } from "react-icons/fa";
 import { useEffect } from "react";
 import { useDragToolBar } from "../hooks/useDragToolBar";
+import { useNavigate } from "react-router";
 
 const Board: React.FC = () => {
   const {
@@ -20,8 +20,6 @@ const Board: React.FC = () => {
     brushWidth,
     setBrushWidth,
     brushWidths,
-    menuOpen,
-    setMenuOpen,
     showToolOptions,
     setShowToolOptions,
     toolOptionsRef,
@@ -39,9 +37,12 @@ const Board: React.FC = () => {
     handleSave,
     handleToolChange,
     toolsWithOptions,
+    activeDrawingTool,
   } = useBoard();
 
   const { toolbarRef, getToolOptionsStyle } = useDragToolBar();
+
+  const navigate = useNavigate();
 
   // Close tool options when clicking outside
   useEffect(() => {
@@ -100,7 +101,7 @@ const Board: React.FC = () => {
       />
 
       {/* Tool Options Panel (Excalidraw-style) */}
-      {showToolOptions && toolsWithOptions.includes(tool) && (
+      {showToolOptions && toolsWithOptions.includes(activeDrawingTool) && (
         <div
           ref={toolOptionsRef}
           style={getToolOptionsStyle()}
@@ -109,8 +110,8 @@ const Board: React.FC = () => {
           {/* Header */}
           <div className="mb-4 pb-3 border-b border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              {toolIcons[tool]}
-              <span className="capitalize">{tool} Options</span>
+              {toolIcons[activeDrawingTool]}
+              <span className="capitalize">{activeDrawingTool} Options</span>
             </h3>
           </div>
 
@@ -196,116 +197,10 @@ const Board: React.FC = () => {
                 </button>
               ))}
             </div>
-
-            {/* Custom Width Slider */}
-            <div className="space-y-2">
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={brushWidth}
-                onChange={(e) => setBrushWidth(Number(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>1px</span>
-                <span className="font-semibold text-gray-700">
-                  {brushWidth}px
-                </span>
-                <span>20px</span>
-              </div>
-            </div>
           </div>
 
-          {/* Preview */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <label className="text-xs font-medium text-gray-600 mb-2 block">
-              Preview
-            </label>
-            <div className="h-20 bg-gray-50 rounded-lg border-2 border-gray-200 flex items-center justify-center">
-              {tool === "rect" && (
-                <div
-                  className="rounded"
-                  style={{
-                    width: "60px",
-                    height: "40px",
-                    border: `${brushWidth}px solid ${color}`,
-                  }}
-                />
-              )}
-              {tool === "circle" && (
-                <div
-                  className="rounded-full"
-                  style={{
-                    width: "50px",
-                    height: "50px",
-                    border: `${brushWidth}px solid ${color}`,
-                  }}
-                />
-              )}
-              {tool === "line" && (
-                <div
-                  style={{
-                    width: "60px",
-                    height: `${brushWidth}px`,
-                    backgroundColor: color,
-                  }}
-                />
-              )}
-              {tool === "brush" && (
-                <div className="flex items-center gap-2">
-                  <div
-                    className="rounded-full"
-                    style={{
-                      width: `${Math.min(brushWidth * 3, 30)}px`,
-                      height: `${Math.min(brushWidth * 3, 30)}px`,
-                      backgroundColor: color,
-                    }}
-                  />
-                  <span className="text-xs text-gray-500">Brush stroke</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Hamburger Menu Button - Top Left Corner */}
-      <div className="fixed top-4 left-4 z-30">
-        <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="p-2 hover:bg-gray-200 bg-white rounded-lg transition-colors shadow-lg border-2 border-gray-300"
-          title="Menu"
-        >
-          <FaBars className="text-gray-700 text-xl" />
-        </button>
-      </div>
-
-      {/* Hamburger Menu Sidebar */}
-      <div
-        className={`fixed top-0 left-0 h-full w-80 bg-white bg-opacity-95 backdrop-blur-sm shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${
-          menuOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {/* Menu header */}
-        <div className="flex items-center justify-between p-2 border-b bg-gray-100 bg-opacity-90">
-          <h2 className="text-lg font-semibold text-gray-800">Settings</h2>
-          <button
-            onClick={() => setMenuOpen(false)}
-            className="p-1 hover:bg-gray-200 rounded transition-colors"
-            title="Close"
-          >
-            <FaTimes className="text-gray-700 text-xl" />
-          </button>
-        </div>
-
-        {/* Menu Content */}
-        <div className="p-3 space-y-4 overflow-auto h-[calc(100%-60px)]">
           {/* Undo/Redo Buttons */}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700">
-              History
-            </label>
+          <div className="mb-4">
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleUndo}
@@ -327,128 +222,8 @@ const Board: React.FC = () => {
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-gray-200"></div>
-
-          {/* Color Picker */}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700">
-              Color
-            </label>
-
-            {/* Color Palette */}
-            <div className="grid grid-cols-6 gap-2">
-              {colorPalette.map((paletteColor) => (
-                <button
-                  key={paletteColor}
-                  onClick={() => setColor(paletteColor)}
-                  className={`w-10 h-10 rounded-lg border-2 transition-all ${
-                    color === paletteColor
-                      ? "border-blue-500 scale-110 shadow-lg"
-                      : "border-gray-300 hover:scale-105"
-                  }`}
-                  style={{ backgroundColor: paletteColor }}
-                  title={paletteColor}
-                >
-                  {color === paletteColor && (
-                    <svg
-                      className="w-full h-full p-1"
-                      fill="none"
-                      stroke={
-                        paletteColor === "#FFFFFF" ? "#000000" : "#FFFFFF"
-                      }
-                      strokeWidth="3"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Custom Color Input */}
-            <div className="flex items-center space-x-3 mt-3">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                Custom:
-              </label>
-              <div className="flex-1 flex items-center space-x-2">
-                <input
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="w-12 h-10 rounded cursor-pointer border-2 border-gray-300"
-                />
-                <input
-                  type="text"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="flex-1 px-2 py-1 border-2 border-gray-300 rounded text-sm font-mono uppercase"
-                  placeholder="#000000"
-                  maxLength={7}
-                />
-              </div>
-            </div>
-
-            {/* Color Preview with Brush */}
-            <div className="flex items-center justify-center p-4 bg-gray-50 rounded">
-              <div className="flex items-center space-x-3">
-                <div
-                  className="rounded-full border-2 border-gray-300"
-                  style={{
-                    width: "25px",
-                    height: `25px`,
-                    backgroundColor: color,
-                  }}
-                />
-                <span className="text-sm text-gray-600">Preview</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-gray-200"></div>
-
-          {/* Brush Width Control */}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700">
-              Brush Width
-            </label>
-            <div className="flex items-center space-x-3">
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={brushWidth}
-                onChange={(e) => setBrushWidth(Number(e.target.value))}
-                className="flex-1"
-              />
-              <span className="text-sm font-semibold text-gray-700 w-12 text-right">
-                {brushWidth}px
-              </span>
-            </div>
-
-            {/* Visual Preview */}
-            <div className="flex items-center justify-center p-4 bg-gray-50 rounded">
-              <div
-                className="bg-gray-800 rounded-full"
-                style={{
-                  width: `${brushWidth * 2}px`,
-                  height: `${brushWidth * 2}px`,
-                }}
-              />
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-gray-200"></div>
-
           {/* Action Buttons */}
-          <div className="flex items-center justify-center space-x-2">
+          <div className="mb-4 flex items-center justify-center space-x-2">
             <button
               onClick={handleClear}
               className="px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center justify-center space-x-2"
@@ -490,6 +265,17 @@ const Board: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* Home Menu Button - Top Left Corner */}
+      <div className="fixed top-4 left-4 z-30">
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="p-2 hover:bg-gray-200 bg-white rounded-lg transition-colors shadow-lg border-2 border-gray-300"
+          title="Go to Dashboard"
+        >
+          <FaHome className="text-gray-700 text-xl" />
+        </button>
       </div>
 
       {/* Zoom Controls - Bottom Left */}

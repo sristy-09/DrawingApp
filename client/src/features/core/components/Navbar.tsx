@@ -1,18 +1,6 @@
 import { FaBrush } from "react-icons/fa";
 import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
-import { getData } from "../context/userContext";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@radix-ui/react-dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import {
-  DropdownMenuItem,
-  DropdownMenuLabel,
-} from "../components/ui/dropdown-menu";
 
 function Navbar() {
   const navigate = useNavigate();

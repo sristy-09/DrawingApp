@@ -5,59 +5,124 @@ import axios from "axios";
 import { debounce } from "lodash";
 
 export function useBoard() {
+  const API_URL = import.meta.env.VITE_API_URL;
   const { id } = useParams<{ id: string }>();
   const canvasRef = useRef<FabricCanvasRef>(null);
   const [color, setColor] = useState<string>("#000000");
   const [brushWidth, setBrushWidth] = useState<number>(3);
   const [tool, setTool] = useState<Tool>("brush");
+  const [activeDrawingTool, setActiveDrawingTool] = useState<Tool>("brush"); // Track which drawing tool is active
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
-    "idle"
+    "idle",
   );
   const [zoom, setZoom] = useState<number>(1);
+
+  // Track if canvas has actually changed
+  const hasChangedRef = useRef(false);
 
   const lastSavedDataRef = useRef<string>("");
   const isDrawingRef = useRef<boolean>(false); // Track if user is actively drawing
   const isSavingRef = useRef<boolean>(false); // Track if save is in progress
 
-   // Tools that have customization options
+  // Track the currently selected object
+  const selectedObjectRef = useRef<any>(null);
+
+  // Tools that have customization options
   const toolsWithOptions: Tool[] = ["brush", "rect", "circle", "line"];
 
   // Brush width presets
   const brushWidths = [1, 2, 3, 5, 8, 12];
 
-  const [menuOpen, setMenuOpen] = useState(false);
   const [showToolOptions, setShowToolOptions] = useState(false);
-  const toolOptionsRef = useRef<HTMLDivElement>(null)
+  const toolOptionsRef = useRef<HTMLDivElement>(null);
 
   const handleClear = () => {
     clearCanvas();
-    setMenuOpen(false);
   };
 
   const handleSave = () => {
     saveBoard();
-    setMenuOpen(false);
   };
 
   const handleToolChange = (newTool: Tool) => {
+    // Store previous tool
     setTool(newTool);
 
-    // Show options for tools that support customization
+    // If it's a drawing tool, remember it as the active drawing tool
     if (toolsWithOptions.includes(newTool)) {
+      setActiveDrawingTool(newTool);
       setShowToolOptions(true);
+    } else if (newTool === "select") {
+      // When switching to select, keep the popup open if we have an active drawing tool
+      if (toolsWithOptions.includes(activeDrawingTool)) {
+        setShowToolOptions(true);
+      } else {
+        setShowToolOptions(false);
+      }
     } else {
+      // For eraser, pan, or other tools
       setShowToolOptions(false);
     }
   };
 
-  const clearCanvas = () => canvasRef.current?.clear();
+  // Modified color setter to updated selected object
+  const handleColorChange = (newColor: string) => {
+    setColor(newColor);
+
+    // Update the selected object if it exists
+    if (selectedObjectRef.current) {
+      const canvas = canvasRef.current?.getCanvas();
+      if (canvas) {
+        selectedObjectRef.current.set({
+          stroke: newColor,
+        });
+        selectedObjectRef.current.setCoords();
+        canvas.fire("object:modified", { target: selectedObjectRef.current });
+        canvas.renderAll();
+
+        // Wait longer and only save to history, not to backend
+        setTimeout(() => {
+          // Only mark as changed, don't trigger backend save immediately
+          hasChangedRef.current = true;
+        }, 100);
+      }
+    }
+  };
+
+  // Modified brush width setter to update selected object
+  const handleBrushWidthChange = (newWidth: number) => {
+    setBrushWidth(newWidth);
+
+    // Update the selected object if it exists
+    if (selectedObjectRef.current) {
+      const canvas = canvasRef.current?.getCanvas();
+      if (canvas) {
+        selectedObjectRef.current.set({
+          strokeWidth: newWidth,
+        });
+        selectedObjectRef.current.setCoords(); // IMPORTANT: Update coordinates
+        canvas.fire("object:modified", { target: selectedObjectRef.current });
+        canvas.renderAll();
+
+        // Wait longer and only save to history, not to backend
+        setTimeout(() => {
+          // Only mark as changed, don't trigger backend save immediately
+          hasChangedRef.current = true;
+        }, 100);
+      }
+    }
+  };
+
+  const clearCanvas = () => {
+    selectedObjectRef.current = null;
+    canvasRef.current?.clear();
+  };
 
   const saveBoard = async (includeThumbnail = false) => {
     if (!canvasRef.current || isSavingRef.current) return;
 
     // Don't save while user is actively drawing
     if (isDrawingRef.current) {
-      console.log("⏭️ Skipping save - user is drawing");
       return;
     }
 
@@ -65,15 +130,8 @@ export function useBoard() {
 
     // Don't save if nothing changed (unless we're adding a thumbnail)
     if (!includeThumbnail && json === lastSavedDataRef.current) {
-      console.log("⏭️ Skipping save - no changes");
       return;
     }
-
-    console.log(
-      includeThumbnail
-        ? "💾 Saving with thumbnail..."
-        : "💾 Saving without thumbnail..."
-    );
 
     isSavingRef.current = true;
     setSaveStatus("saving");
@@ -89,23 +147,15 @@ export function useBoard() {
 
         if (thumbnail) {
           payload.thumbnail = thumbnail;
-          console.log("✅ Thumbnail added to payload");
-        } else {
-          console.log("⚠️ Thumbnail generation failed, skipping thumbnail");
         }
       }
 
-      const res = await axios.patch(
-        `http://localhost:3000/board/${id}`,
-        payload
-      );
+      await axios.patch(`${API_URL}/board/${id}`, payload);
 
       lastSavedDataRef.current = json;
       setSaveStatus("saved");
 
       setTimeout(() => setSaveStatus("idle"), 2000);
-
-      console.log("✅ Saved successfully");
     } catch (error) {
       console.error("❌ Error saving board:", error);
       setSaveStatus("idle");
@@ -114,9 +164,6 @@ export function useBoard() {
     }
   };
 
-  // Track if canvas has actually changed
-  const hasChangedRef = useRef(false);
-
   // Create debounced save function - only save when not drawing
   const debouncedSave = useCallback(
     debounce(() => {
@@ -124,25 +171,21 @@ export function useBoard() {
         saveBoard(false);
       }
     }, 2000),
-    [id]
+    [id],
   );
 
   // Debounced thumbnail generation (5 seconds) - only when not drawing
   const debouncedThumbnailSave = useCallback(
     debounce(() => {
       if (hasChangedRef.current && !isDrawingRef.current) {
-        console.log("⏰ 5 seconds elapsed - saving with thumbnail");
         saveBoard(true);
         hasChangedRef.current = false;
-      } else {
-        console.log("⏭️ No changes or user drawing - skipping thumbnail");
       }
     }, 5000),
-    [id]
+    [id],
   );
 
   const handleCanvasChange = () => {
-    console.log("🎨 Canvas changed");
     hasChangedRef.current = true;
     debouncedSave();
     debouncedThumbnailSave();
@@ -151,7 +194,7 @@ export function useBoard() {
   useEffect(() => {
     const loadBoard = async () => {
       try {
-        const res = await axios.get(`http://localhost:3000/board/${id}`);
+        const res = await axios.get(`${API_URL}/board/${id}`);
         const json = res.data.canvasData;
 
         if (json && canvasRef.current?.loadFromJson) {
@@ -176,12 +219,10 @@ export function useBoard() {
 
     const handleMouseDown = () => {
       isDrawingRef.current = true;
-      console.log("🖊️ Drawing started");
     };
 
     const handleMouseUp = () => {
       isDrawingRef.current = false;
-      console.log("🖊️ Drawing ended");
 
       // Trigger save after drawing completes
       if (hasChangedRef.current) {
@@ -190,9 +231,87 @@ export function useBoard() {
       }
     };
 
+    // Track when an object is selected
+    const handleSelectionCreated = (e: any) => {
+      if (e.selected && e.selected[0]) {
+        const obj = e.selected[0];
+        selectedObjectRef.current = obj;
+
+        // Update UI to show current object's properties
+        if (obj.stroke) {
+          setColor(obj.stroke);
+        }
+        if (obj.strokeWidth) {
+          setBrushWidth(obj.strokeWidth);
+        }
+
+        // Determine which tool this object belongs to and show its popup
+        let objectTool: Tool | null = null;
+        if (obj.type === "rect") {
+          objectTool = "rect";
+        } else if (obj.type === "circle") {
+          objectTool = "circle";
+        } else if (obj.type === "line") {
+          objectTool = "line";
+        } else if (obj.type === "path") {
+          objectTool = "brush";
+        }
+
+        if (objectTool && toolsWithOptions.includes(objectTool)) {
+          setActiveDrawingTool(objectTool);
+          setShowToolOptions(true);
+        }
+      }
+    };
+
+    // Track when selection is updated (when switching between objects)
+    const handleSelectionUpdated = (e: any) => {
+      if (e.selected && e.selected[0]) {
+        const obj = e.selected[0];
+        selectedObjectRef.current = obj;
+
+        // Update UI to show current object's properties
+        if (obj.stroke) {
+          setColor(obj.stroke);
+        }
+        if (obj.strokeWidth) {
+          setBrushWidth(obj.strokeWidth);
+        }
+
+        // Determine which tool this object belongs to and show its popup
+        let objectTool: Tool | null = null;
+        if (obj.type === "rect") {
+          objectTool = "rect";
+        } else if (obj.type === "circle") {
+          objectTool = "circle";
+        } else if (obj.type === "line") {
+          objectTool = "line";
+        } else if (obj.type === "path") {
+          objectTool = "brush";
+        }
+
+        if (objectTool && toolsWithOptions.includes(objectTool)) {
+          setActiveDrawingTool(objectTool);
+          setShowToolOptions(true);
+        }
+      }
+    };
+
+    // Track when selection is cleared
+    const handleSelectionCleared = () => {
+      selectedObjectRef.current = null;
+      // Don't close popup when selection is cleared
+      // User might want to draw more shapes
+    };
+
     // Track drawing state
     canvas.on("mouse:down", handleMouseDown);
     canvas.on("mouse:up", handleMouseUp);
+
+    // Track selection changes
+    canvas.on("selection:created", handleSelectionCreated);
+    canvas.on("selection:updated", handleSelectionUpdated);
+    canvas.on("selection:cleared", handleSelectionCleared);
 
     // Track canvas changes
     canvas.on("object:modified", handleCanvasChange);
@@ -205,12 +324,15 @@ export function useBoard() {
       debouncedThumbnailSave.cancel();
       canvas.off("mouse:down", handleMouseDown);
       canvas.off("mouse:up", handleMouseUp);
+      canvas.off("selection:created", handleSelectionCreated);
+      canvas.off("selection:updated", handleSelectionUpdated);
+      canvas.off("selection:cleared", handleSelectionCleared);
       canvas.off("object:modified", handleCanvasChange);
       canvas.off("object:added", handleCanvasChange);
       canvas.off("path:created", handleCanvasChange);
       canvas.off("object:removed", handleCanvasChange);
     };
-  }, [debouncedSave, debouncedThumbnailSave]);
+  }, [debouncedSave, debouncedThumbnailSave, activeDrawingTool]);
 
   // When color/brushWidth/tool change, apply new settings
   useEffect(() => {
@@ -247,15 +369,14 @@ export function useBoard() {
     color,
     brushWidth,
     brushWidths,
-    menuOpen,
-    setMenuOpen,
     showToolOptions,
     setShowToolOptions,
     toolOptionsRef,
-    tool,
+    tool, // Current active tool (for toolbar highlight)
+    activeDrawingTool, // Last drawing tool (for popup content)
     setTool,
-    setColor,
-    setBrushWidth,
+    setColor: handleColorChange,
+    setBrushWidth: handleBrushWidthChange,
     clearCanvas,
     saveBoard: () => saveBoard(false),
     saveStatus,
