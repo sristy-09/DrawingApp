@@ -20,8 +20,6 @@ const Board: React.FC = () => {
     brushWidth,
     setBrushWidth,
     brushWidths,
-    menuOpen,
-    setMenuOpen,
     showToolOptions,
     setShowToolOptions,
     toolOptionsRef,

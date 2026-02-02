@@ -24,7 +24,6 @@ export const toolIcons: Record<Tool, JSX.Element> = {
 
 const Toolbar: React.FC<ToolbarProps> = ({
   tool,
-  setTool,
   handleToolChange,
   toolsWithOptions,
   showToolOptions,

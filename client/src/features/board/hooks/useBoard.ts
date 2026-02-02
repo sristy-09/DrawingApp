@@ -5,6 +5,7 @@ import axios from "axios";
 import { debounce } from "lodash";
 
 export function useBoard() {
+  const API_URL = import.meta.env.VITE_API_URL;
   const { id } = useParams<{ id: string }>();
   const canvasRef = useRef<FabricCanvasRef>(null);
   const [color, setColor] = useState<string>("#000000");
@@ -32,23 +33,18 @@ export function useBoard() {
   // Brush width presets
   const brushWidths = [1, 2, 3, 5, 8, 12];
 
-  const [menuOpen, setMenuOpen] = useState(false);
   const [showToolOptions, setShowToolOptions] = useState(false);
   const toolOptionsRef = useRef<HTMLDivElement>(null);
 
   const handleClear = () => {
     clearCanvas();
-    setMenuOpen(false);
   };
 
   const handleSave = () => {
     saveBoard();
-    setMenuOpen(false);
   };
 
   const handleToolChange = (newTool: Tool) => {
-    console.log(`🔧 Tool change: ${tool} → ${newTool}`);
-
     // Store previous tool
     setTool(newTool);
 
@@ -56,32 +52,27 @@ export function useBoard() {
     if (toolsWithOptions.includes(newTool)) {
       setActiveDrawingTool(newTool);
       setShowToolOptions(true);
-      console.log("showing popup for tool:", newTool);
     } else if (newTool === "select") {
       // When switching to select, keep the popup open if we have an active drawing tool
       if (toolsWithOptions.includes(activeDrawingTool)) {
         setShowToolOptions(true);
-        console.log("Keeping popup open for:", activeDrawingTool);
       } else {
         setShowToolOptions(false);
       }
     } else {
       // For eraser, pan, or other tools
       setShowToolOptions(false);
-      (console.log("hiding popup"), newTool);
     }
   };
 
   // Modified color setter to updated selected object
   const handleColorChange = (newColor: string) => {
-    console.log("Color change:", newColor);
     setColor(newColor);
 
     // Update the selected object if it exists
     if (selectedObjectRef.current) {
       const canvas = canvasRef.current?.getCanvas();
       if (canvas) {
-        console.log("🎨 Updating selected object color");
         selectedObjectRef.current.set({
           stroke: newColor,
         });
@@ -100,14 +91,12 @@ export function useBoard() {
 
   // Modified brush width setter to update selected object
   const handleBrushWidthChange = (newWidth: number) => {
-    console.log("Brush width change:", newWidth);
     setBrushWidth(newWidth);
 
     // Update the selected object if it exists
     if (selectedObjectRef.current) {
       const canvas = canvasRef.current?.getCanvas();
       if (canvas) {
-        console.log("🖌️ Updating selected object brush width");
         selectedObjectRef.current.set({
           strokeWidth: newWidth,
         });
@@ -134,7 +123,6 @@ export function useBoard() {
 
     // Don't save while user is actively drawing
     if (isDrawingRef.current) {
-      console.log("⏭️ Skipping save - user is drawing");
       return;
     }
 
@@ -142,15 +130,8 @@ export function useBoard() {
 
     // Don't save if nothing changed (unless we're adding a thumbnail)
     if (!includeThumbnail && json === lastSavedDataRef.current) {
-      console.log("⏭️ Skipping save - no changes");
       return;
     }
-
-    console.log(
-      includeThumbnail
-        ? "💾 Saving with thumbnail..."
-        : "💾 Saving without thumbnail...",
-    );
 
     isSavingRef.current = true;
     setSaveStatus("saving");
@@ -166,23 +147,15 @@ export function useBoard() {
 
         if (thumbnail) {
           payload.thumbnail = thumbnail;
-          console.log("✅ Thumbnail added to payload");
-        } else {
-          console.log("⚠️ Thumbnail generation failed, skipping thumbnail");
         }
       }
 
-      const res = await axios.patch(
-        `http://localhost:3000/board/${id}`,
-        payload,
-      );
+      await axios.patch(`${API_URL}/board/${id}`, payload);
 
       lastSavedDataRef.current = json;
       setSaveStatus("saved");
 
       setTimeout(() => setSaveStatus("idle"), 2000);
-
-      console.log("✅ Saved successfully");
     } catch (error) {
       console.error("❌ Error saving board:", error);
       setSaveStatus("idle");
@@ -205,18 +178,14 @@ export function useBoard() {
   const debouncedThumbnailSave = useCallback(
     debounce(() => {
       if (hasChangedRef.current && !isDrawingRef.current) {
-        console.log("⏰ 5 seconds elapsed - saving with thumbnail");
         saveBoard(true);
         hasChangedRef.current = false;
-      } else {
-        console.log("⏭️ No changes or user drawing - skipping thumbnail");
       }
     }, 5000),
     [id],
   );
 
   const handleCanvasChange = () => {
-    console.log("🎨 Canvas changed");
     hasChangedRef.current = true;
     debouncedSave();
     debouncedThumbnailSave();
@@ -225,7 +194,7 @@ export function useBoard() {
   useEffect(() => {
     const loadBoard = async () => {
       try {
-        const res = await axios.get(`http://localhost:3000/board/${id}`);
+        const res = await axios.get(`${API_URL}/board/${id}`);
         const json = res.data.canvasData;
 
         if (json && canvasRef.current?.loadFromJson) {
@@ -250,12 +219,10 @@ export function useBoard() {
 
     const handleMouseDown = () => {
       isDrawingRef.current = true;
-      console.log("🖊️ Drawing started");
     };
 
     const handleMouseUp = () => {
       isDrawingRef.current = false;
-      console.log("🖊️ Drawing ended");
 
       // Trigger save after drawing completes
       if (hasChangedRef.current) {
@@ -269,7 +236,6 @@ export function useBoard() {
       if (e.selected && e.selected[0]) {
         const obj = e.selected[0];
         selectedObjectRef.current = obj;
-        console.log("Object selected:", obj.type);
 
         // Update UI to show current object's properties
         if (obj.stroke) {
@@ -292,7 +258,6 @@ export function useBoard() {
         }
 
         if (objectTool && toolsWithOptions.includes(objectTool)) {
-          console.log("Switching tool to:", objectTool);
           setActiveDrawingTool(objectTool);
           setShowToolOptions(true);
         }
@@ -304,7 +269,6 @@ export function useBoard() {
       if (e.selected && e.selected[0]) {
         const obj = e.selected[0];
         selectedObjectRef.current = obj;
-        console.log("Selection updated:", obj.type);
 
         // Update UI to show current object's properties
         if (obj.stroke) {
@@ -327,7 +291,6 @@ export function useBoard() {
         }
 
         if (objectTool && toolsWithOptions.includes(objectTool)) {
-          console.log("Switching tool to:", objectTool);
           setActiveDrawingTool(objectTool);
           setShowToolOptions(true);
         }
@@ -337,7 +300,6 @@ export function useBoard() {
     // Track when selection is cleared
     const handleSelectionCleared = () => {
       selectedObjectRef.current = null;
-      console.log("Selection cleared");
       // Don't close popup when selection is cleared
       // User might want to draw more shapes
     };
@@ -407,8 +369,6 @@ export function useBoard() {
     color,
     brushWidth,
     brushWidths,
-    menuOpen,
-    setMenuOpen,
     showToolOptions,
     setShowToolOptions,
     toolOptionsRef,

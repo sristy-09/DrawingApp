@@ -25,12 +25,12 @@ const BoardList: React.FC<BoardListProps> = ({
   currentUserId,
   onBoardDeleted,
 }) => {
+  const API_URL = import.meta.env.VITE_API_URL;
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const isOwner = board.owner?._id === currentUserId;
-  console.log(isOwner);
 
   // Access and format updatedAt
   const updateDate = new Date(board.updatedAt);
@@ -52,7 +52,7 @@ const BoardList: React.FC<BoardListProps> = ({
   };
 
   const deleteBoard = async (boardId: string) => {
-    const res = await axios.delete(`http://localhost:3000/board/${boardId}`, {
+    const res = await axios.delete(`${API_URL}/board/${boardId}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
     return res.data;

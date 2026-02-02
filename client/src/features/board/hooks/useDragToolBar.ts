@@ -5,7 +5,7 @@ export function useDragToolBar() {
   // Draggable toolbar state
   const [dockPosition, setDockPosition] = useState<DockPosition>("right");
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [, setDragStart] = useState({ x: 0, y: 0 });
   const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 });
   const toolbarRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);

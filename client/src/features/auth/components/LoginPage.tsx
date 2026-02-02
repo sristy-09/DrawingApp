@@ -16,6 +16,8 @@ import { useLogin } from "../hooks/useLogin";
 
 function LoginPage() {
   const { myForm, handleChange, handleSubmit, errors } = useLogin();
+
+  const API_URL = import.meta.env.VITE_API_URL;
   return (
     <div className="flex justify-center items-center mt-40">
       <Card className="w-full max-w-sm ">
@@ -75,9 +77,7 @@ function LoginPage() {
         </CardContent>
         <CardFooter className="flex-col gap-2">
           <Button
-            onClick={() =>
-              window.open("http://localhost:3000/auth/google", "_self")
-            }
+            onClick={() => window.open(`${API_URL}/auth/google`, "_self")}
             variant="outline"
             className="w-full"
           >

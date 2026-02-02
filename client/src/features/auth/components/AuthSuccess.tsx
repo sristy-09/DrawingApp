@@ -7,6 +7,8 @@ function AuthSuccess() {
   const { setUser } = getData();
   const navigate = useNavigate();
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   useEffect(() => {
     const handleAuth = async () => {
       const params = new URLSearchParams(window.location.search);
@@ -18,7 +20,7 @@ function AuthSuccess() {
           "Authorization"
         ] = `Bearer ${accessToken}`;
         try {
-          const res = await axios.get("http://localhost:3000/auth/me", {
+          const res = await axios.get(`${API_URL}/auth/me`, {
             headers: {
               Authorization: `Bearer ${accessToken}`,
             },

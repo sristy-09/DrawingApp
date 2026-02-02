@@ -40,20 +40,12 @@ export function useFabricCanvas({
   const saveHistory = useCallback(() => {
     const canvas = canvasInstance.current;
 
-    console.log("💾 saveHistory called", {
-      hasCanvas: !!canvas,
-      isUndoRedo: isUndoRedoRef.current,
-      currentIndex: historyIndexRef.current,
-      historyLength: historyRef.current.length,
-    });
-
     if (!canvas) {
-      console.log("❌ No canvas, skipping");
       return;
     }
 
+    // Undo/redo in progress, skip saving
     if (isUndoRedoRef.current) {
-      console.log("❌ Undo/redo in progress, skipping");
       return;
     }
 
@@ -70,7 +62,6 @@ export function useFabricCanvas({
       // Don't save if state hasn't changed
       const lastState = historyRef.current[historyIndexRef.current];
       if (lastState === state) {
-        console.log("⏭️ State unchanged, skipping");
         return;
       }
 
@@ -86,12 +77,6 @@ export function useFabricCanvas({
       historyRef.current.push(state);
       historyIndexRef.current++;
 
-      console.log("✅ History saved!", {
-        index: historyIndexRef.current,
-        total: historyRef.current.length,
-        objectCount: json.objects?.length || 0,
-      });
-
       // Limit history to 50 states
       if (historyRef.current.length > 50) {
         historyRef.current.shift();
@@ -106,28 +91,14 @@ export function useFabricCanvas({
   const undo = useCallback(() => {
     const canvas = canvasInstance.current;
 
-    console.log("⏪ Undo called", {
-      hasCanvas: !!canvas,
-      currentIndex: historyIndexRef.current,
-      historyLength: historyRef.current.length,
-    });
-
     if (!canvas) {
-      console.log("❌ No canvas");
       return;
     }
 
+    // No more undo states
     if (historyIndexRef.current <= 0) {
-      console.log("❌ No more undo states (at beginning)");
       return;
     }
-
-    console.log(
-      "⏪ Undoing from index",
-      historyIndexRef.current,
-      "to",
-      historyIndexRef.current - 1,
-    );
 
     isUndoRedoRef.current = true;
     historyIndexRef.current--;
@@ -136,16 +107,10 @@ export function useFabricCanvas({
 
     try {
       const stateObj = JSON.parse(state);
-      console.log(
-        "📥 Loading state with",
-        stateObj.objects?.length || 0,
-        "objects",
-      );
 
       canvas.loadFromJSON(stateObj, () => {
         canvas.renderOnAddRemove = true;
         canvas.requestRenderAll();
-        console.log("✅ Undo complete");
 
         // Small delay to let Fabric.js finish
         setTimeout(() => {
@@ -163,28 +128,14 @@ export function useFabricCanvas({
   const redo = useCallback(() => {
     const canvas = canvasInstance.current;
 
-    console.log("⏩ Redo called", {
-      hasCanvas: !!canvas,
-      currentIndex: historyIndexRef.current,
-      historyLength: historyRef.current.length,
-    });
-
     if (!canvas) {
-      console.log("❌ No canvas");
       return;
     }
 
+    // No more redo states
     if (historyIndexRef.current >= historyRef.current.length - 1) {
-      console.log("❌ No more redo states (at end)");
       return;
     }
-
-    console.log(
-      "⏩ Redoing from index",
-      historyIndexRef.current,
-      "to",
-      historyIndexRef.current + 1,
-    );
 
     isUndoRedoRef.current = true;
     historyIndexRef.current++;
@@ -193,17 +144,12 @@ export function useFabricCanvas({
 
     try {
       const stateObj = JSON.parse(state);
-      console.log(
-        "📥 Loading state with",
-        stateObj.objects?.length || 0,
-        "objects",
-      );
 
       canvas.loadFromJSON(stateObj, () => {
         canvas.renderOnAddRemove = true;
         canvas.requestRenderAll();
-        console.log("✅ Redo complete");
 
+        // Small delay to let Fabric.js finish
         setTimeout(() => {
           isUndoRedoRef.current = false;
         }, 50);
@@ -354,7 +300,6 @@ export function useFabricCanvas({
 
     // Save empty state
     setTimeout(() => {
-      console.log("Saving cleared canvas state");
       saveHistory();
     }, 100);
   }, [saveHistory]);
@@ -830,8 +775,6 @@ export function useFabricCanvas({
     const canvas = canvasInstance.current;
     if (!canvas) return;
 
-    console.log("Loading canvas from JSON, setting isUndoRedo=true");
-
     // Don't save history during load
     // isUndoRedoRef.current = true;
 
@@ -841,7 +784,6 @@ export function useFabricCanvas({
     canvas.loadFromJSON(json, () => {
       canvas.renderOnAddRemove = true;
       canvas.renderAll();
-      console.log("Canvas loaded from JSON");
 
       // Reset history with loaded state
       historyRef.current = [];
@@ -858,12 +800,6 @@ export function useFabricCanvas({
 
         historyRef.current.push(state);
         historyIndexRef.current = 0;
-
-        console.log("💾 Initial state saved to history", {
-          index: historyIndexRef.current,
-          total: historyRef.current.length,
-          objectCount: canvasJSON.objects?.length || 0,
-        });
       } catch (error) {
         console.error("❌ Error saving initial state:", error);
       }
@@ -926,19 +862,11 @@ export function useFabricCanvas({
       fab.renderAll();
     });
 
-    console.log("Canvas initialized");
-
-    console.log("Setting up history event listeners");
-
-    const handleHistoryEvent = (e?: any) => {
-      console.log("Canvas event triggered:", e?.type || "unknown");
-
+    const handleHistoryEvent = () => {
       setTimeout(() => {
         if (!isUndoRedoRef.current) {
-          console.log("Calling saveHistory from event");
           saveHistory();
         } else {
-          console.log("Skipping saveHistory (undo/redo in progress)");
         }
       }, 100);
     };
@@ -946,16 +874,12 @@ export function useFabricCanvas({
     fab.on("object:modified", handleHistoryEvent);
     fab.on("object:removed", handleHistoryEvent);
 
-    console.log("✅ History listeners attached to canvas");
-
     // Save initial empty state
     setTimeout(() => {
-      console.log("💾 Saving initial canvas state");
       saveHistory();
     }, 300);
 
     return () => {
-      console.log("🧹 Disposing canvas");
       fab.off("object:added", handleHistoryEvent);
       fab.off("object:modified", handleHistoryEvent);
       fab.off("object:removed", handleHistoryEvent);
