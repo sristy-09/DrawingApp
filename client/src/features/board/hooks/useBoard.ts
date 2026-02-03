@@ -28,7 +28,7 @@ export function useBoard() {
   const selectedObjectRef = useRef<any>(null);
 
   // Tools that have customization options
-  const toolsWithOptions: Tool[] = ["brush", "rect", "circle", "line"];
+  const toolsWithOptions: Tool[] = ["brush", "rect", "circle", "line", "text"];
 
   // Brush width presets
   const brushWidths = [1, 2, 3, 5, 8, 12];
@@ -73,9 +73,16 @@ export function useBoard() {
     if (selectedObjectRef.current) {
       const canvas = canvasRef.current?.getCanvas();
       if (canvas) {
-        selectedObjectRef.current.set({
-          stroke: newColor,
-        });
+        // For text objects, update fill color; for other objects, update stroke
+        if (selectedObjectRef.current.type === "textbox") {
+          selectedObjectRef.current.set({
+            fill: newColor,
+          });
+        } else {
+          selectedObjectRef.current.set({
+            stroke: newColor,
+          });
+        }
         selectedObjectRef.current.setCoords();
         canvas.fire("object:modified", { target: selectedObjectRef.current });
         canvas.renderAll();
@@ -238,8 +245,16 @@ export function useBoard() {
         selectedObjectRef.current = obj;
 
         // Update UI to show current object's properties
-        if (obj.stroke) {
-          setColor(obj.stroke);
+        if (obj.type === "textbox") {
+          // For text objects, use fill color
+          if (obj.fill) {
+            setColor(obj.fill);
+          }
+        } else {
+          // For other objects, use stroke color
+          if (obj.stroke) {
+            setColor(obj.stroke);
+          }
         }
         if (obj.strokeWidth) {
           setBrushWidth(obj.strokeWidth);
@@ -255,6 +270,8 @@ export function useBoard() {
           objectTool = "line";
         } else if (obj.type === "path") {
           objectTool = "brush";
+        } else if (obj.type === "textbox") {
+          objectTool = "text";
         }
 
         if (objectTool && toolsWithOptions.includes(objectTool)) {
@@ -271,8 +288,16 @@ export function useBoard() {
         selectedObjectRef.current = obj;
 
         // Update UI to show current object's properties
-        if (obj.stroke) {
-          setColor(obj.stroke);
+        if (obj.type === "textbox") {
+          // For text objects, use fill color
+          if (obj.fill) {
+            setColor(obj.fill);
+          }
+        } else {
+          // For other objects, use stroke color
+          if (obj.stroke) {
+            setColor(obj.stroke);
+          }
         }
         if (obj.strokeWidth) {
           setBrushWidth(obj.strokeWidth);
@@ -288,6 +313,8 @@ export function useBoard() {
           objectTool = "line";
         } else if (obj.type === "path") {
           objectTool = "brush";
+        } else if (obj.type === "textbox") {
+          objectTool = "text";
         }
 
         if (objectTool && toolsWithOptions.includes(objectTool)) {

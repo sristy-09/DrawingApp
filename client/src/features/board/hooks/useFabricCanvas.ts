@@ -24,6 +24,9 @@ export function useFabricCanvas({
     move?: any;
     up?: any;
     extra?: any;
+    textEntered?: any;
+    textExited?: any;
+    dblclick?: any;
   }>({});
 
   // Track current shape being drawn and eraser state
@@ -31,6 +34,11 @@ export function useFabricCanvas({
   const isDrawingShapeRef = useRef<boolean>(false);
   const eraserCircleRef = useRef<fabric.Circle | null>(null);
   const isErasingRef = useRef<boolean>(false);
+
+  // Text editing state
+  const editingTextRef = useRef<fabric.Textbox | null>(null);
+  const isEditingTextRef = useRef<boolean>(false);
+  const textCursorPositionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
   // UNDO/REDO STATE
   const historyRef = useRef<string[]>([]);
@@ -168,6 +176,9 @@ export function useFabricCanvas({
     if (h.move) canvas.off("mouse:move", h.move);
     if (h.up) canvas.off("mouse:up", h.up);
     if (h.extra) canvas.off("path:created", h.extra);
+    if (h.textEntered) canvas.off("text:editing:entered", h.textEntered);
+    if (h.textExited) canvas.off("text:editing:exited", h.textExited);
+    if (h.dblclick) canvas.off("mouse:dblclick", h.dblclick);
     activeToolHandlersRef.current = {};
 
     // Clean up any leftover shape
@@ -183,7 +194,83 @@ export function useFabricCanvas({
       eraserCircleRef.current = null;
     }
     isErasingRef.current = false;
+
+    // Exit text editing mode cleanly
+    exitTextEditing(canvas);
   }
+
+  // Text editing helper functions
+  const exitTextEditing = useCallback((canvas: fabric.Canvas) => {
+    if (editingTextRef.current && isEditingTextRef.current) {
+      const textObj = editingTextRef.current;
+      
+      // Store cursor position before exiting
+      if (textObj.selectionStart !== undefined && textObj.selectionEnd !== undefined) {
+        textCursorPositionRef.current = {
+          start: textObj.selectionStart,
+          end: textObj.selectionEnd
+        };
+      }
+      
+      textObj.exitEditing();
+      
+      // Remove empty or whitespace-only text objects
+      const text = textObj.text?.trim() || '';
+      if (text === '') {
+        canvas.remove(textObj);
+        canvas.requestRenderAll();
+        setTimeout(() => saveHistory(), 0);
+      }
+      
+      editingTextRef.current = null;
+      isEditingTextRef.current = false;
+    }
+  }, [saveHistory]);
+
+  const enterTextEditing = useCallback((textObj: fabric.Textbox, canvas: fabric.Canvas) => {
+    // Exit any existing text editing first
+    exitTextEditing(canvas);
+    
+    editingTextRef.current = textObj;
+    isEditingTextRef.current = true;
+    
+    textObj.enterEditing();
+    
+    // Restore cursor position if available
+    const savedPosition = textCursorPositionRef.current;
+    if (savedPosition && textObj.text) {
+      const textLength = textObj.text.length;
+      textObj.selectionStart = Math.min(savedPosition.start, textLength);
+      textObj.selectionEnd = Math.min(savedPosition.end, textLength);
+    }
+    
+    canvas.requestRenderAll();
+  }, [exitTextEditing]);
+
+  const createTextBox = useCallback((x: number, y: number, canvas: fabric.Canvas) => {
+    const textBox = new fabric.Textbox('', {
+      left: x,
+      top: y,
+      width: 200,
+      fontSize: 16,
+      fontFamily: 'Arial',
+      fill: color,
+      selectable: true,
+      evented: true,
+      hasControls: true,
+      hasBorders: true,
+      lockScalingFlip: true,
+      splitByGrapheme: true,
+    });
+
+    canvas.add(textBox);
+    canvas.setActiveObject(textBox);
+    
+    // Enter editing mode immediately
+    enterTextEditing(textBox, canvas);
+    
+    return textBox;
+  }, [color, enterTextEditing]);
 
   // -----------------------------
   // ZOOM FUNCTIONS
@@ -364,6 +451,9 @@ export function useFabricCanvas({
       } else if (_tool === "rect" || _tool === "circle" || _tool === "line") {
         canvas.defaultCursor = "crosshair";
         canvas.hoverCursor = "crosshair";
+      } else if (_tool === "text") {
+        canvas.defaultCursor = "text";
+        canvas.hoverCursor = "text";
       } else if (_tool === "select") {
         canvas.defaultCursor = "default";
         canvas.hoverCursor = "move";
@@ -373,15 +463,16 @@ export function useFabricCanvas({
       }
 
       /* ----------------------------------
-     OBJECT SELECTABILITY
-    ---------------------------------- */
+       OBJECT SELECTABILITY
+      ---------------------------------- */
       // Make all objects selectable ONLY when in select mode
       // OR when in a drawing tool mode (so we can see the active selection)
       const shouldMakeSelectable =
         _tool === "select" ||
         _tool === "rect" ||
         _tool === "circle" ||
-        _tool === "line";
+        _tool === "line" ||
+        _tool === "text";
 
       canvas.forEachObject((obj) => {
         obj.selectable = shouldMakeSelectable;
@@ -389,6 +480,33 @@ export function useFabricCanvas({
         obj.hoverCursor = shouldMakeSelectable ? "move" : "default";
         obj.hasControls = _tool === "select"; // Show controls only in select mode
         obj.hasBorders = shouldMakeSelectable;
+        
+        // Special handling for text objects
+        if (obj instanceof fabric.Textbox) {
+          // In text mode: editable but not resizable
+          // In select mode: movable + resizable  
+          // In other modes: not selectable
+          if (_tool === "text") {
+            obj.selectable = true;
+            obj.evented = true;
+            obj.hasControls = false; // No resize controls in text mode
+            obj.hasBorders = true;
+            obj.lockScalingX = true;
+            obj.lockScalingY = true;
+          } else if (_tool === "select") {
+            obj.selectable = true;
+            obj.evented = true;
+            obj.hasControls = true; // Show resize controls in select mode
+            obj.hasBorders = true;
+            obj.lockScalingX = false;
+            obj.lockScalingY = false;
+          } else {
+            obj.selectable = false;
+            obj.evented = false;
+            obj.hasControls = false;
+            obj.hasBorders = false;
+          }
+        }
       });
 
       if (!canvas.freeDrawingBrush) {
@@ -620,7 +738,8 @@ export function useFabricCanvas({
         _tool !== "brush" &&
         _tool !== "eraser" &&
         _tool !== "select" &&
-        _tool !== "pan"
+        _tool !== "pan" &&
+        _tool !== "text"
       ) {
         const onDown = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
           const canvas = canvasInstance.current;
@@ -746,6 +865,88 @@ export function useFabricCanvas({
           down: onDown,
           move: onMove,
           up: onUp,
+        };
+      }
+
+      /* ----------------------------------
+       TEXT TOOL
+      ---------------------------------- */
+      // Handle text tool
+      if (_tool === "text" || _tool === "select") {
+        const onDown = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+          const target = e.target;
+          
+          // If clicking on an existing text object in text or select mode
+          if (target && target instanceof fabric.Textbox && (_tool === "text" || _tool === "select")) {
+            // Only allow editing in text mode or select mode
+            enterTextEditing(target, canvas);
+            return;
+          }
+          
+          // If in text mode and clicking on empty canvas, create new text
+          if (_tool === "text" && !target) {
+            const pointer = canvas.getPointer(e.e);
+            createTextBox(pointer.x, pointer.y, canvas);
+            
+            // Save history after creating text
+            setTimeout(() => saveHistory(), 100);
+          }
+        };
+
+        const onDblClick = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+          const target = e.target;
+          
+          // Double-click on text object in any mode (text or select) enters editing
+          if (target && target instanceof fabric.Textbox && (_tool === "text" || _tool === "select")) {
+            enterTextEditing(target, canvas);
+          }
+        };
+
+        const onTextEntered = (e: any) => {
+          const textObj = e.target;
+          if (textObj instanceof fabric.Textbox) {
+            editingTextRef.current = textObj;
+            isEditingTextRef.current = true;
+          }
+        };
+
+        const onTextExited = (e: any) => {
+          const textObj = e.target;
+          if (textObj instanceof fabric.Textbox) {
+            // Store cursor position
+            if (textObj.selectionStart !== undefined && textObj.selectionEnd !== undefined) {
+              textCursorPositionRef.current = {
+                start: textObj.selectionStart,
+                end: textObj.selectionEnd
+              };
+            }
+            
+            // Remove empty text objects
+            const text = textObj.text?.trim() || '';
+            if (text === '') {
+              canvas.remove(textObj);
+              canvas.requestRenderAll();
+              setTimeout(() => saveHistory(), 0);
+            } else {
+              // Save history for text content changes
+              setTimeout(() => saveHistory(), 0);
+            }
+            
+            editingTextRef.current = null;
+            isEditingTextRef.current = false;
+          }
+        };
+
+        canvas.on("mouse:down", onDown);
+        canvas.on("mouse:dblclick", onDblClick);
+        canvas.on("text:editing:entered", onTextEntered);
+        canvas.on("text:editing:exited", onTextExited);
+
+        activeToolHandlersRef.current = {
+          down: onDown,
+          dblclick: onDblClick,
+          textEntered: onTextEntered,
+          textExited: onTextExited,
         };
       }
     },

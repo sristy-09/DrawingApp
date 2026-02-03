@@ -115,10 +115,10 @@ const Board: React.FC = () => {
             </h3>
           </div>
 
-          {/* Stroke Color */}
+          {/* Color */}
           <div className="mb-4">
             <label className="text-xs font-medium text-gray-600 mb-2 block">
-              Stroke Color
+              {activeDrawingTool === "text" ? "Text Color" : "Stroke Color"}
             </label>
             <div className="grid grid-cols-5 gap-2">
               {colorPalette.map((paletteColor) => (
@@ -170,34 +170,36 @@ const Board: React.FC = () => {
             </div>
           </div>
 
-          {/* Stroke Width */}
-          <div className="mb-4">
-            <label className="text-xs font-medium text-gray-600 mb-2 block">
-              Stroke Width
-            </label>
-            <div className="grid grid-cols-6 gap-2 mb-3">
-              {brushWidths.map((width) => (
-                <button
-                  key={width}
-                  onClick={() => setBrushWidth(width)}
-                  className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${
-                    brushWidth === width
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-300 hover:border-gray-400 bg-white"
-                  }`}
-                  title={`${width}px`}
-                >
-                  <div
-                    className="rounded-full bg-gray-700"
-                    style={{
-                      width: `${Math.min(width * 2, 16)}px`,
-                      height: `${Math.min(width * 2, 16)}px`,
-                    }}
-                  />
-                </button>
-              ))}
+          {/* Stroke Width - Hide for text tool */}
+          {activeDrawingTool !== "text" && (
+            <div className="mb-4">
+              <label className="text-xs font-medium text-gray-600 mb-2 block">
+                Stroke Width
+              </label>
+              <div className="grid grid-cols-6 gap-2 mb-3">
+                {brushWidths.map((width) => (
+                  <button
+                    key={width}
+                    onClick={() => setBrushWidth(width)}
+                    className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${
+                      brushWidth === width
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-300 hover:border-gray-400 bg-white"
+                    }`}
+                    title={`${width}px`}
+                  >
+                    <div
+                      className="rounded-full bg-gray-700"
+                      style={{
+                        width: `${Math.min(width * 2, 16)}px`,
+                        height: `${Math.min(width * 2, 16)}px`,
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Undo/Redo Buttons */}
           <div className="mb-4">
