@@ -3,6 +3,9 @@ import type { FabricCanvasRef, Tool } from "../types/types";
 import { useParams } from "react-router";
 import axios from "axios";
 import { debounce } from "lodash";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { setCanvasData, setIsGuest, loadGuestBoardData } from "@/store/boardSlice";
+import { getData } from "@/features/core/context/userContext";
 
 export function useBoard() {
   const API_URL = import.meta.env.VITE_API_URL;
@@ -16,6 +19,11 @@ export function useBoard() {
     "idle",
   );
   const [zoom, setZoom] = useState<number>(1);
+  
+  // Redux
+  const dispatch = useAppDispatch();
+  const guestCanvasData = useAppSelector((state) => state.board.canvasData);
+  const { isAuthenticated } = getData();
 
   // Track if canvas has actually changed
   const hasChangedRef = useRef(false);
@@ -133,6 +141,16 @@ export function useBoard() {
       return;
     }
 
+    // GUEST USER: Save to Redux/localStorage
+    if (!isAuthenticated) {
+      dispatch(setCanvasData(json));
+      lastSavedDataRef.current = json;
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 1000);
+      return;
+    }
+
+    // AUTHENTICATED USER: Save to backend
     isSavingRef.current = true;
     setSaveStatus("saving");
 
@@ -191,8 +209,33 @@ export function useBoard() {
     debouncedThumbnailSave();
   };
 
+  // Set guest mode on mount
+  useEffect(() => {
+    dispatch(setIsGuest(!isAuthenticated));
+  }, [isAuthenticated, dispatch]);
+
+  // Load board data
   useEffect(() => {
     const loadBoard = async () => {
+      // GUEST USER: Load from Redux/localStorage
+      if (!isAuthenticated) {
+        dispatch(loadGuestBoardData());
+        
+        // Wait for Redux state to update
+        setTimeout(() => {
+          if (guestCanvasData && canvasRef.current?.loadFromJson) {
+            canvasRef.current.loadFromJson(guestCanvasData);
+            lastSavedDataRef.current = guestCanvasData;
+            
+            setTimeout(() => {
+              canvasRef.current?.applySettings?.({ color, brushWidth, tool });
+            }, 50);
+          }
+        }, 100);
+        return;
+      }
+
+      // AUTHENTICATED USER: Load from backend
       try {
         const res = await axios.get(`${API_URL}/board/${id}`);
         const json = res.data.canvasData;
@@ -210,7 +253,7 @@ export function useBoard() {
       }
     };
     loadBoard();
-  }, [id]);
+  }, [id, isAuthenticated, dispatch, guestCanvasData]);
 
   // Track drawing state to prevent saves during drawing
   useEffect(() => {
