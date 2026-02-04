@@ -25,13 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/auth", user);
 app.use("/board", board);
 
-// Serve frontend build
-app.use(express.static(path.join(__dirname, "/client/dist")));
 
-// React router fallback (ALWAYS LAST)
-app.get(/.*/, (_, res) => {
-  res.sendFile(path.resolve(__dirname, "client", "dist", "index.html"));
-});
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

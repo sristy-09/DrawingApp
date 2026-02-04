@@ -61,7 +61,7 @@ export function useSignup() {
 
     // No guest data, proceed with normal signup
     try {
-      const res = await axios.post("/auth/register", myForm);
+      const res = await axios.post(`${API_URL}/auth/register`, myForm);
 
       // Store token if provided
       if (res.data.token) {
@@ -99,7 +99,7 @@ export function useSignup() {
       setLoading(true);
       
       // First, register the user
-      const res = await axios.post("/auth/register", pendingSignupData);
+      const res = await axios.post(`${API_URL}/auth/register`, pendingSignupData);
 
       // Store token if provided
       if (res.data.token) {
@@ -156,7 +156,7 @@ export function useSignup() {
       dispatch(clearBoardData());
 
       // Register the user
-      const res = await axios.post("/auth/register", pendingSignupData);
+      const res = await axios.post(`${API_URL}/auth/register`, pendingSignupData);
 
       // Store token if provided
       if (res.data.token) {

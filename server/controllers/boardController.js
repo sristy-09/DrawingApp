@@ -8,6 +8,8 @@ export const createBoard = async (req, res) => {
       title = "Untitled Board",
       description = "",
       isPublic = false,
+      canvasData = null,
+      thumbnail = null,
     } = req.body;
 
     const board = new Board({
@@ -15,6 +17,8 @@ export const createBoard = async (req, res) => {
       description,
       owner: req.user.id,
       isPublic,
+      canvasData,
+      thumbnail,
     });
 
     await board.save();

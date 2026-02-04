@@ -81,7 +81,7 @@ function UserDashboard() {
         </div>
 
         {showNewBoardForm && (
-          <div className="mb-8 bg-gray-800 p-6 rounded-lg border border-gray-700">
+          <div className="mb-8 bg-background text-foreground p-6 rounded-lg border border-gray-700">
             <h2 className="text-xl font-semibold mb-4">Create New Board</h2>
             <form onSubmit={createBoard} className="space-y-4">
               <div>

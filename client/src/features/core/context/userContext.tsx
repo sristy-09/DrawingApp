@@ -39,6 +39,8 @@ export const UserContext = createContext<UserContextType | undefined>(
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  
+  const API_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const loadUser = async () => {
@@ -47,9 +49,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         try {
           axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
-          const response = await axios.get("/auth/me");
+          const response = await axios.get(`${API_URL}/auth/me`);
           setUser(response.data.user);
         } catch (error) {
+          console.error("Failed to load user:", error);
           localStorage.removeItem("token");
           delete axios.defaults.headers.common["Authorization"];
         }
@@ -57,12 +60,12 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
     };
     loadUser();
-  }, []);
+  }, [API_URL]);
 
   const login = async (credentials: Credentials): Promise<void> => {
     try {
       const response = await axios.post<{ token: string; user: User }>(
-        "/auth/login",
+        `${API_URL}/auth/login`,
         credentials
       );
       const { token, user } = response.data;
