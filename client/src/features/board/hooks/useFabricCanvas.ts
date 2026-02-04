@@ -25,6 +25,7 @@ export function useFabricCanvas({
     up?: any;
     extra?: any;
     textEntered?: any;
+    textChanged?: any;
     textExited?: any;
     dblclick?: any;
   }>({});
@@ -177,6 +178,7 @@ export function useFabricCanvas({
     if (h.up) canvas.off("mouse:up", h.up);
     if (h.extra) canvas.off("path:created", h.extra);
     if (h.textEntered) canvas.off("text:editing:entered", h.textEntered);
+    if (h.textChanged) canvas.off("text:changed", h.textChanged);
     if (h.textExited) canvas.off("text:editing:exited", h.textExited);
     if (h.dblclick) canvas.off("mouse:dblclick", h.dblclick);
     activeToolHandlersRef.current = {};
@@ -910,6 +912,16 @@ export function useFabricCanvas({
           }
         };
 
+        const onTextChanged = (e: any) => {
+          // This event fires while user is typing
+          // We'll handle debounced history saves here
+          const textObj = e.target;
+          if (textObj instanceof fabric.Textbox && isEditingTextRef.current) {
+            // Mark that text is being actively modified
+            // The parent component will handle debounced API saves
+          }
+        };
+
         const onTextExited = (e: any) => {
           const textObj = e.target;
           if (textObj instanceof fabric.Textbox) {
@@ -940,12 +952,14 @@ export function useFabricCanvas({
         canvas.on("mouse:down", onDown);
         canvas.on("mouse:dblclick", onDblClick);
         canvas.on("text:editing:entered", onTextEntered);
+        canvas.on("text:changed", onTextChanged);
         canvas.on("text:editing:exited", onTextExited);
 
         activeToolHandlersRef.current = {
           down: onDown,
           dblclick: onDblClick,
           textEntered: onTextEntered,
+          textChanged: onTextChanged,
           textExited: onTextExited,
         };
       }
