@@ -49,4 +49,11 @@ const boardSlice = createSlice({
 });
 
 export const { setCanvasData, setIsGuest, clearBoardData, loadGuestBoardData } = boardSlice.actions;
+
+// Selector to check if guest has unsaved data
+export const selectHasGuestData = () => {
+  const localData = localStorage.getItem('guestBoardData');
+  return !!localData && localData !== '{"objects":[],"background":"#FFFFFF"}';
+};
+
 export default boardSlice.reducer;
