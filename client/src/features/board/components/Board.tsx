@@ -3,15 +3,30 @@ import FabricCanvas from "./FabricCanvas";
 import { useBoard } from "../hooks/useBoard";
 import {
   FaCheck,
-  FaHome,
   FaRedo,
   FaSearchMinus,
   FaSearchPlus,
   FaUndo,
+  FaBars,
+  FaHome,
+  FaSignOutAlt,
+  FaMoon,
+  FaSun,
+  FaDesktop,
 } from "react-icons/fa";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDragToolBar } from "../hooks/useDragToolBar";
 import { useNavigate } from "react-router";
+import { useTheme } from "../../core/context/themeProvider";
+import { getData } from "../../core/context/userContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../core/components/ui/dropdown-menu";
 
 const Board: React.FC = () => {
   const {
@@ -41,8 +56,18 @@ const Board: React.FC = () => {
   } = useBoard();
 
   const { toolbarRef, getToolOptionsStyle } = useDragToolBar();
-
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
+  const { user} = getData();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleLogout = () => {
+    navigate("/login");
+  };
+
+  const handleDashboard = () => {
+    navigate("/dashboard");
+  };
 
   // Close tool options when clicking outside
   useEffect(() => {
@@ -267,15 +292,72 @@ const Board: React.FC = () => {
         </div>
       )}
 
-      {/* Home Menu Button - Top Left Corner */}
+      {/* Hamburger Menu - Top Left Corner */}
       <div className="fixed top-4 left-4 z-30">
-        <button
-          onClick={() => navigate("/dashboard")}
-          className="p-2 hover:bg-gray-200 bg-white rounded-lg transition-colors shadow-lg border-2 border-gray-300"
-          title="Go to Dashboard"
-        >
-          <FaHome className="text-gray-700 text-xl" />
-        </button>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="p-2 hover:bg-gray-200 bg-white rounded-lg transition-colors shadow-lg border-2 border-gray-300"
+              title="Menu"
+            >
+              <FaBars className="text-gray-700 text-xl" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56 bg-white" align="start">
+            <DropdownMenuLabel className="font-semibold">
+              {user?.username || user?.email}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuItem onClick={handleDashboard} className="cursor-pointer">
+              <FaHome className="mr-2" />
+              <span>Dashboard</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuLabel className="text-xs text-gray-500">
+              Theme
+            </DropdownMenuLabel>
+            
+            <DropdownMenuItem 
+              onClick={() => setTheme("light")} 
+              className="cursor-pointer"
+            >
+              <FaSun className="mr-2" />
+              <span>Light</span>
+              {theme === "light" && <FaCheck className="ml-auto text-blue-500" />}
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={() => setTheme("dark")} 
+              className="cursor-pointer"
+            >
+              <FaMoon className="mr-2" />
+              <span>Dark</span>
+              {theme === "dark" && <FaCheck className="ml-auto text-blue-500" />}
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={() => setTheme("system")} 
+              className="cursor-pointer"
+            >
+              <FaDesktop className="mr-2" />
+              <span>System</span>
+              {theme === "system" && <FaCheck className="ml-auto text-blue-500" />}
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuItem 
+              onClick={handleLogout} 
+              className="cursor-pointer text-red-600"
+            >
+              <FaSignOutAlt className="mr-2" />
+              <span>Sign In</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Zoom Controls - Bottom Left */}
