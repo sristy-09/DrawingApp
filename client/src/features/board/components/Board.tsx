@@ -9,10 +9,10 @@ import {
   FaUndo,
   FaBars,
   FaHome,
-  FaSignOutAlt,
   FaMoon,
   FaSun,
   FaDesktop,
+  FaSignInAlt,
 } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { useDragToolBar } from "../hooks/useDragToolBar";
@@ -353,7 +353,7 @@ const Board: React.FC = () => {
               onClick={handleLogout} 
               className="cursor-pointer text-red-600"
             >
-              <FaSignOutAlt className="mr-2" />
+              <FaSignInAlt className="mr-2" />
               <span>Sign In</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
