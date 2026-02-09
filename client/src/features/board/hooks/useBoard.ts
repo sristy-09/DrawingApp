@@ -11,6 +11,7 @@ export function useBoard() {
   const API_URL = import.meta.env.VITE_API_URL;
   const { id } = useParams<{ id: string }>();
   const canvasRef = useRef<FabricCanvasRef>(null);
+  const previousThemeRef = useRef<string | null>(null);
   
   // Get theme-aware default color
   const getDefaultColor = () => {
@@ -20,8 +21,8 @@ export function useBoard() {
   
   const [color, setColor] = useState<string>(getDefaultColor());
   const [brushWidth, setBrushWidth] = useState<number>(3);
-  const [tool, setTool] = useState<Tool>("brush");
-  const [activeDrawingTool, setActiveDrawingTool] = useState<Tool>("brush"); // Track which drawing tool is active
+  const [tool, setTool] = useState<Tool>("eraser");
+  const [activeDrawingTool, setActiveDrawingTool] = useState<Tool>("eraser"); // Track which drawing tool is active
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
     "idle",
   );
@@ -402,11 +403,27 @@ export function useBoard() {
 
   // Update default color when theme changes
   useEffect(() => {
+    // Initialize theme tracking
+    if (previousThemeRef.current === null) {
+      previousThemeRef.current = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    }
+
     const observer = new MutationObserver(() => {
-      const newDefaultColor = getDefaultColor();
-      // Only update if user hasn't manually changed the color
-      if (color === "#000000" || color === "#FFFFFF") {
-        setColor(newDefaultColor);
+      const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+      
+      // Only invert if theme actually changed
+      if (previousThemeRef.current !== currentTheme) {
+        previousThemeRef.current = currentTheme;
+        
+        // Normalize current color for comparison
+        const normalizedColor = color.toLowerCase().trim();
+        
+        // Invert current color if it's black or white
+        if (normalizedColor === "#000000" || normalizedColor === "#000" || normalizedColor === "black") {
+          setColor("#FFFFFF");
+        } else if (normalizedColor === "#ffffff" || normalizedColor === "#fff" || normalizedColor === "white") {
+          setColor("#000000");
+        }
       }
     });
 

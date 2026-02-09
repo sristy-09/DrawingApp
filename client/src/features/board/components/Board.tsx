@@ -93,20 +93,25 @@ const Board: React.FC = () => {
     };
   }, [showToolOptions]);
 
-  // Predefined color palette
-  const colorPalette = [
-    "#000000", // Black
-    "#FF0000", // Red
-    "#00FF00", // Green
-    "#0000FF", // Blue
-    "#FFFF00", // Yellow
-    "#FF00FF", // Magenta
-    "#00FFFF", // Cyan
-    "#FF8800", // Orange
-    "#8800FF", // Purple
-    "#00FF88", // Mint
-    "#FF0088", // Pink
-  ];
+  // Predefined color palette - theme-aware
+  const getColorPalette = () => {
+    const isDark = document.documentElement.classList.contains('dark');
+    return [
+      isDark ? "#FFFFFF" : "#000000", // White in dark mode, Black in light mode
+      "#FF0000", // Red
+      "#00FF00", // Green
+      "#0000FF", // Blue
+      "#FFFF00", // Yellow
+      "#FF00FF", // Magenta
+      "#00FFFF", // Cyan
+      "#FF8800", // Orange
+      "#8800FF", // Purple
+      "#00FF88", // Mint
+      "#FF0088", // Pink
+    ];
+  };
+
+  const colorPalette = getColorPalette();
 
   return (
     <div className="board-container h-screen w-screen overflow-hidden relative bg-background">

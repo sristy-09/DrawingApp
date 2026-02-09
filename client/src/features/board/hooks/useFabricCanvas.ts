@@ -18,6 +18,7 @@ export function useFabricCanvas({
   const isPanningRef = useRef<boolean>(false);
   const lastPosXRef = useRef<number>(0);
   const lastPosYRef = useRef<number>(0);
+  const previousThemeRef = useRef<string | null>(null);
 
   const activeToolHandlersRef = useRef<{
     down?: any;
@@ -41,6 +42,14 @@ export function useFabricCanvas({
   const getCanvasBackgroundColor = useCallback(() => {
     const isDark = document.documentElement.classList.contains('dark');
     return isDark ? '#1a1a1a' : '#FFFFFF';
+  }, []);
+
+  // Check if theme has changed
+  const hasThemeChanged = useCallback(() => {
+    const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    const changed = previousThemeRef.current !== null && previousThemeRef.current !== currentTheme;
+    previousThemeRef.current = currentTheme;
+    return changed;
   }, []);
 
   const saveHistory = useCallback(() => {
@@ -166,6 +175,43 @@ export function useFabricCanvas({
       historyIndexRef.current--; // Restore index on error
     }
   }, []);
+
+  // ===== INVERT STROKE COLORS =====
+  const invertStrokeColors = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    let hasChanges = false;
+
+    canvas.forEachObject((obj) => {
+      const currentStroke = obj.stroke as string;
+      
+      if (!currentStroke) return;
+      
+      // Normalize color to lowercase for comparison
+      const normalizedStroke = currentStroke.toLowerCase().trim();
+      
+      // Invert black to white
+      if (normalizedStroke === '#000000' || normalizedStroke === '#000' || normalizedStroke === 'black') {
+        obj.set({ stroke: '#FFFFFF' });
+        hasChanges = true;
+      } 
+      // Invert white to black
+      else if (normalizedStroke === '#ffffff' || normalizedStroke === '#fff' || normalizedStroke === 'white') {
+        obj.set({ stroke: '#000000' });
+        hasChanges = true;
+      }
+    });
+
+    if (hasChanges) {
+      canvas.renderAll();
+      
+      // Save to history after inverting colors
+      setTimeout(() => {
+        saveHistory();
+      }, 100);
+    }
+  }, [saveHistory]);
 
   function cleanupToolHandlers(canvas: fabric.Canvas) {
     const h = activeToolHandlersRef.current;
@@ -827,10 +873,14 @@ export function useFabricCanvas({
 
     canvasInstance.current = fab;
 
+    // Initialize theme tracking
+    previousThemeRef.current = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+
     // Update canvas background when theme changes
     const updateCanvasTheme = () => {
-      if (fab) {
+      if (fab && hasThemeChanged()) {
         fab.backgroundColor = getCanvasBackgroundColor();
+        invertStrokeColors();
         fab.renderAll();
       }
     };
@@ -919,7 +969,7 @@ export function useFabricCanvas({
       fab.dispose();
       canvasInstance.current = null;
     };
-  }, [saveHistory, getCanvasBackgroundColor]);
+  }, [saveHistory, getCanvasBackgroundColor, invertStrokeColors, hasThemeChanged]);
 
   // -----------------------------
   // UPDATE SETTINGS WHEN PROPS CHANGE
