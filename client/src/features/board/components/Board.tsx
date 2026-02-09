@@ -96,7 +96,6 @@ const Board: React.FC = () => {
   // Predefined color palette
   const colorPalette = [
     "#000000", // Black
-    "#FFFFFF", // White
     "#FF0000", // Red
     "#00FF00", // Green
     "#0000FF", // Blue
@@ -110,7 +109,7 @@ const Board: React.FC = () => {
   ];
 
   return (
-    <div className="board-container h-screen w-screen overflow-hidden relative bg-gray-100">
+    <div className="board-container h-screen w-screen overflow-hidden relative bg-background">
       <Toolbar
         tool={tool}
         setTool={setTool}
@@ -132,11 +131,11 @@ const Board: React.FC = () => {
         <div
           ref={toolOptionsRef}
           style={getToolOptionsStyle()}
-          className="z-30 bg-white border-2 border-gray-300 rounded-xl shadow-xl p-4 min-w-[280px] max-w-[320px]"
+          className="z-30 bg-card border-2 border-border rounded-xl shadow-xl p-4 min-w-[280px] max-w-[320px]"
         >
           {/* Header */}
-          <div className="mb-4 pb-3 border-b border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+          <div className="mb-4 pb-3 border-b border-border">
+            <h3 className="text-sm font-semibold text-card-foreground flex items-center gap-2">
               {toolIcons[activeDrawingTool]}
               <span className="capitalize">{activeDrawingTool} Options</span>
             </h3>
@@ -144,7 +143,7 @@ const Board: React.FC = () => {
 
           {/* Stroke Color */}
           <div className="mb-4">
-            <label className="text-xs font-medium text-gray-600 mb-2 block">
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
               Stroke Color
             </label>
             <div className="grid grid-cols-5 gap-2">
@@ -153,8 +152,8 @@ const Board: React.FC = () => {
                   key={paletteColor}
                   onClick={() => setColor(paletteColor)}
                   className={`w-10 h-10 rounded-lg border-2 transition-all relative ${color === paletteColor
-                    ? "border-blue-500 scale-110 shadow-md"
-                    : "border-gray-300 hover:scale-105"
+                    ? "border-primary scale-110 shadow-md"
+                    : "border-border hover:scale-105"
                     }`}
                   style={{ backgroundColor: paletteColor }}
                   title={paletteColor}
@@ -182,13 +181,13 @@ const Board: React.FC = () => {
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="w-10 h-10 rounded-lg cursor-pointer border-2 border-gray-300"
+                className="w-10 h-10 rounded-lg cursor-pointer border-2 border-border"
               />
               <input
                 type="text"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm font-mono uppercase focus:outline-none focus:border-blue-500"
+                className="flex-1 px-3 py-2 border-2 border-border rounded-lg text-sm font-mono uppercase focus:outline-none focus:border-primary bg-background text-foreground"
                 placeholder="#000000"
                 maxLength={7}
               />
@@ -197,7 +196,7 @@ const Board: React.FC = () => {
 
           {/* Stroke Width */}
           <div className="mb-4">
-            <label className="text-xs font-medium text-gray-600 mb-2 block">
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">
               Stroke Width
             </label>
             <div className="grid grid-cols-6 gap-2 mb-3">
@@ -206,13 +205,13 @@ const Board: React.FC = () => {
                   key={width}
                   onClick={() => setBrushWidth(width)}
                   className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${brushWidth === width
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-300 hover:border-gray-400 bg-white"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/50 bg-card"
                     }`}
                   title={`${width}px`}
                 >
                   <div
-                    className="rounded-full bg-gray-700"
+                    className="rounded-full bg-foreground"
                     style={{
                       width: `${Math.min(width * 2, 16)}px`,
                       height: `${Math.min(width * 2, 16)}px`,
@@ -228,7 +227,7 @@ const Board: React.FC = () => {
             <div className="flex items-center space-x-2">
               <button
                 onClick={handleUndo}
-                className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center space-x-2"
+                className="flex-1 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors font-medium flex items-center justify-center space-x-2"
                 title="Undo"
               >
                 <FaUndo className="w-4 h-4" />
@@ -237,7 +236,7 @@ const Board: React.FC = () => {
 
               <button
                 onClick={handleRedo}
-                className="flex-1 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium flex items-center justify-center space-x-2"
+                className="flex-1 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors font-medium flex items-center justify-center space-x-2"
                 title="Redo"
               >
                 <FaRedo className="w-4 h-4" />
@@ -296,13 +295,13 @@ const Board: React.FC = () => {
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
-              className="p-2 hover:bg-gray-200 bg-white rounded-lg transition-colors shadow-lg border-2 border-gray-300"
+              className="p-2 hover:bg-accent bg-card rounded-lg transition-colors shadow-lg border-2 border-border"
               title="Menu"
             >
-              <FaBars className="text-gray-700 text-xl" />
+              <FaBars className="text-card-foreground text-xl" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56 bg-white" align="start">
+          <DropdownMenuContent className="w-56" align="start">
             {isAuthenticated && (
               <>
                 <DropdownMenuLabel className="font-semibold">
@@ -369,18 +368,18 @@ const Board: React.FC = () => {
       </div>
 
       {/* Zoom Controls - Bottom Left */}
-      <div className="fixed bottom-4 left-4 z-50 flex items-center space-x-1 bg-white border-2 border-gray-300 rounded-lg shadow-lg p-2">
+      <div className="fixed bottom-4 left-4 z-50 flex items-center space-x-1 bg-card border-2 border-border rounded-lg shadow-lg p-2">
         <button
           onClick={handleZoomOut}
-          className="p-1 hover:bg-gray-100 rounded transition-colors"
+          className="p-1 hover:bg-accent rounded transition-colors"
           title="Zoom Out"
         >
-          <FaSearchMinus className="text-gray-700" />
+          <FaSearchMinus className="text-card-foreground" />
         </button>
 
         <button
           onClick={handleResetZoom}
-          className="text-sm text-gray-700 font-medium min-w-[60px] text-center px-2 py-1 hover:bg-gray-100 rounded transition-colors"
+          className="text-sm text-card-foreground font-medium min-w-[60px] text-center px-2 py-1 hover:bg-accent rounded transition-colors"
           title="Reset Zoom"
         >
           {Math.round(zoom * 100)}%
@@ -388,10 +387,10 @@ const Board: React.FC = () => {
 
         <button
           onClick={handleZoomIn}
-          className="p-1 hover:bg-gray-100 rounded transition-colors"
+          className="p-1 hover:bg-accent rounded transition-colors"
           title="Zoom In"
         >
-          <FaSearchPlus className="text-gray-700" />
+          <FaSearchPlus className="text-card-foreground" />
         </button>
       </div>
 

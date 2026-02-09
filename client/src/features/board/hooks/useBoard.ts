@@ -3,15 +3,22 @@ import type { FabricCanvasRef, Tool } from "../types/types";
 import { useParams } from "react-router";
 import axios from "axios";
 import { debounce } from "lodash";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { setCanvasData, setIsGuest, loadGuestBoardData } from "@/store/boardSlice";
-import { getData } from "@/features/core/context/userContext";
+import { useAppDispatch, useAppSelector } from "../../../store/hooks"
+import { setCanvasData, setIsGuest, loadGuestBoardData } from "../../../store/boardSlice";
+import { getData } from "../../core/context/userContext";
 
 export function useBoard() {
   const API_URL = import.meta.env.VITE_API_URL;
   const { id } = useParams<{ id: string }>();
   const canvasRef = useRef<FabricCanvasRef>(null);
-  const [color, setColor] = useState<string>("#000000");
+  
+  // Get theme-aware default color
+  const getDefaultColor = () => {
+    const isDark = document.documentElement.classList.contains('dark');
+    return isDark ? "#FFFFFF" : "#000000";
+  };
+  
+  const [color, setColor] = useState<string>(getDefaultColor());
   const [brushWidth, setBrushWidth] = useState<number>(3);
   const [tool, setTool] = useState<Tool>("brush");
   const [activeDrawingTool, setActiveDrawingTool] = useState<Tool>("brush"); // Track which drawing tool is active
@@ -393,12 +400,23 @@ export function useBoard() {
     return () => clearInterval(interval);
   }, []);
 
+  // Update default color when theme changes
   useEffect(() => {
-    document.documentElement.classList.add("board-force-light");
-    return () => {
-      document.documentElement.classList.remove("board-force-light");
-    };
-  }, []);
+    const observer = new MutationObserver(() => {
+      const newDefaultColor = getDefaultColor();
+      // Only update if user hasn't manually changed the color
+      if (color === "#000000" || color === "#FFFFFF") {
+        setColor(newDefaultColor);
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, [color]);
 
   const handleZoomIn = () => canvasRef.current?.zoomIn();
   const handleZoomOut = () => canvasRef.current?.zoomOut();

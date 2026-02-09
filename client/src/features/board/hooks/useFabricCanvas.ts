@@ -37,6 +37,12 @@ export function useFabricCanvas({
   const historyIndexRef = useRef<number>(-1);
   const isUndoRedoRef = useRef<boolean>(false);
 
+  // Get canvas background color based on theme
+  const getCanvasBackgroundColor = useCallback(() => {
+    const isDark = document.documentElement.classList.contains('dark');
+    return isDark ? '#1a1a1a' : '#FFFFFF';
+  }, []);
+
   const saveHistory = useCallback(() => {
     const canvas = canvasInstance.current;
 
@@ -816,10 +822,32 @@ export function useFabricCanvas({
     const fab = new fabric.Canvas(el, {
       isDrawingMode: tool === "brush",
       selection: tool === "select",
-      backgroundColor: "#FFFFFF",
+      backgroundColor: getCanvasBackgroundColor(),
     });
 
     canvasInstance.current = fab;
+
+    // Update canvas background when theme changes
+    const updateCanvasTheme = () => {
+      if (fab) {
+        fab.backgroundColor = getCanvasBackgroundColor();
+        fab.renderAll();
+      }
+    };
+
+    // Listen for theme changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          updateCanvasTheme();
+        }
+      });
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
 
     const resize = () => {
       el.width = window.innerWidth;
@@ -880,6 +908,7 @@ export function useFabricCanvas({
     }, 300);
 
     return () => {
+      observer.disconnect();
       fab.off("object:added", handleHistoryEvent);
       fab.off("object:modified", handleHistoryEvent);
       fab.off("object:removed", handleHistoryEvent);
@@ -890,7 +919,7 @@ export function useFabricCanvas({
       fab.dispose();
       canvasInstance.current = null;
     };
-  }, [saveHistory]);
+  }, [saveHistory, getCanvasBackgroundColor]);
 
   // -----------------------------
   // UPDATE SETTINGS WHEN PROPS CHANGE
