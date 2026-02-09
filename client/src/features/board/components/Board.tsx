@@ -13,6 +13,7 @@ import {
   FaSun,
   FaDesktop,
   FaSignInAlt,
+  FaSignOutAlt,
 } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { useDragToolBar } from "../hooks/useDragToolBar";
@@ -58,10 +59,11 @@ const Board: React.FC = () => {
   const { toolbarRef, getToolOptionsStyle } = useDragToolBar();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { user} = getData();
+  const { user, isAuthenticated, logout } = getData();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = () => {
+    logout();
     navigate("/login");
   };
 
@@ -150,22 +152,20 @@ const Board: React.FC = () => {
                 <button
                   key={paletteColor}
                   onClick={() => setColor(paletteColor)}
-                  className={`w-10 h-10 rounded-lg border-2 transition-all relative ${
-                    color === paletteColor
-                      ? "border-blue-500 scale-110 shadow-md"
-                      : "border-gray-300 hover:scale-105"
-                  }`}
+                  className={`w-10 h-10 rounded-lg border-2 transition-all relative ${color === paletteColor
+                    ? "border-blue-500 scale-110 shadow-md"
+                    : "border-gray-300 hover:scale-105"
+                    }`}
                   style={{ backgroundColor: paletteColor }}
                   title={paletteColor}
                 >
                   {color === paletteColor && (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <FaCheck
-                        className={`text-sm ${
-                          paletteColor === "#000000"
-                            ? "text-white"
-                            : "text-white"
-                        }`}
+                        className={`text-sm ${paletteColor === "#000000"
+                          ? "text-white"
+                          : "text-white"
+                          }`}
                         style={{
                           filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
                         }}
@@ -205,11 +205,10 @@ const Board: React.FC = () => {
                 <button
                   key={width}
                   onClick={() => setBrushWidth(width)}
-                  className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${
-                    brushWidth === width
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-300 hover:border-gray-400 bg-white"
-                  }`}
+                  className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${brushWidth === width
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-300 hover:border-gray-400 bg-white"
+                    }`}
                   title={`${width}px`}
                 >
                   <div
@@ -304,42 +303,46 @@ const Board: React.FC = () => {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56 bg-white" align="start">
-            <DropdownMenuLabel className="font-semibold">
-              {user?.username || user?.email}
-            </DropdownMenuLabel>
+            {isAuthenticated && (
+              <>
+                <DropdownMenuLabel className="font-semibold">
+                  {user?.username || user?.email}
+                </DropdownMenuLabel>
+              </>
+            )}
             <DropdownMenuSeparator />
-            
+
             <DropdownMenuItem onClick={handleDashboard} className="cursor-pointer">
               <FaHome className="mr-2" />
               <span>Dashboard</span>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
-            
+
             <DropdownMenuLabel className="text-xs text-gray-500">
               Theme
             </DropdownMenuLabel>
-            
-            <DropdownMenuItem 
-              onClick={() => setTheme("light")} 
+
+            <DropdownMenuItem
+              onClick={() => setTheme("light")}
               className="cursor-pointer"
             >
               <FaSun className="mr-2" />
               <span>Light</span>
               {theme === "light" && <FaCheck className="ml-auto text-blue-500" />}
             </DropdownMenuItem>
-            
-            <DropdownMenuItem 
-              onClick={() => setTheme("dark")} 
+
+            <DropdownMenuItem
+              onClick={() => setTheme("dark")}
               className="cursor-pointer"
             >
               <FaMoon className="mr-2" />
               <span>Dark</span>
               {theme === "dark" && <FaCheck className="ml-auto text-blue-500" />}
             </DropdownMenuItem>
-            
-            <DropdownMenuItem 
-              onClick={() => setTheme("system")} 
+
+            <DropdownMenuItem
+              onClick={() => setTheme("system")}
               className="cursor-pointer"
             >
               <FaDesktop className="mr-2" />
@@ -348,14 +351,19 @@ const Board: React.FC = () => {
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
-            
-            <DropdownMenuItem 
-              onClick={handleLogout} 
-              className="cursor-pointer text-red-600"
+
+            {isAuthenticated ? (<DropdownMenuItem
+              onClick={handleLogout}
+              className="cursor-pointer text-blue-400"
             >
-              <FaSignInAlt className="mr-2" />
-              <span>Sign In</span>
-            </DropdownMenuItem>
+              <FaSignOutAlt className="mr-2 text-blue-400" />
+              <span>Sign Out</span>
+            </DropdownMenuItem>) : (
+              <DropdownMenuItem onClick={() => navigate("/login")} className="cursor-pointer text-blue-400">
+                <FaSignInAlt className="mr-2 text-blue-400" />
+                <span>Sign In</span>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
