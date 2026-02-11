@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import BoardList from "../../board-list/components/BoardList";
 import { useUserDashboard } from "../hooks/useUserDashboard";
-import { Moon, Sun, Plus, Palette, Grid3x3, Monitor } from "lucide-react";
+import { Plus, Palette, Grid3x3 } from "lucide-react";
 import { Button } from "../../core/components/ui/button";
 import {
   DropdownMenu,
@@ -25,7 +25,6 @@ function UserDashboard() {
     fetchBoards,
     createBoard,
     handleLogout,
-    setTheme,
     handleBoardDeleted,
   } = useUserDashboard();
 
@@ -71,31 +70,6 @@ function UserDashboard() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
-            {/* Theme Toggle */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
-                  <Sun className="h-[1.1rem] w-[1.1rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                  <Moon className="absolute h-[1.1rem] w-[1.1rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                  <span className="sr-only">Toggle theme</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTheme("light")}>
-                  <Sun className="mr-2 h-4 w-4" />
-                  Light
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")}>
-                  <Moon className="mr-2 h-4 w-4" />
-                  Dark
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")}>
-                  <Monitor className="mr-2 h-4 w-4" />
-                  System
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
             {/* Profile Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -144,7 +118,7 @@ function UserDashboard() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-3xl font-bold tracking-tight mb-1">
-                Welcome back, {user.username || "Creator"}! 
+                Welcome back, {user.username || "Creator"}!
               </h2>
               <p className="text-muted-foreground">
                 {boards.length === 0

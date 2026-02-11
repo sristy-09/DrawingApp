@@ -3,12 +3,10 @@ import { getData } from "../../core/context/userContext";
 import type { Board } from "../types/types";
 import axios from "axios";
 import { useNavigate } from "react-router";
-import { useTheme } from "../../core/context/themeProvider";
 
 export function useUserDashboard() {
   const { user, logout } = getData();
   const navigate = useNavigate();
-  const { setTheme } = useTheme();
 
   const [boards, setBoards] = useState<Board[]>([]); // <- typed as Board array
 
@@ -72,7 +70,6 @@ export function useUserDashboard() {
     fetchBoards,
     createBoard,
     handleLogout,
-    setTheme,
     handleBoardDeleted,
   };
 }

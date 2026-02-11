@@ -6,7 +6,7 @@
 - **Styling**: Tailwind CSS 4.1.17
 - **UI Components**: Radix UI primitives with custom components
 - **Canvas Library**: Fabric.js 6.9.0 for drawing functionality
-- **State Management**: React Context API (UserContext, ThemeProvider)
+- **State Management**: React Context API (UserContext)
 - **Routing**: React Router 7.9.6
 - **HTTP Client**: Axios 1.13.2
 - **Authentication**: @react-oauth/google for OAuth integration

@@ -9,9 +9,6 @@ import {
   FaUndo,
   FaBars,
   FaHome,
-  FaMoon,
-  FaSun,
-  FaDesktop,
   FaSignInAlt,
   FaSignOutAlt,
   FaTrash,
@@ -20,7 +17,6 @@ import {
 import { useEffect, useState } from "react";
 import { useDragToolBar } from "../hooks/useDragToolBar";
 import { useNavigate } from "react-router";
-import { useTheme } from "../../core/context/themeProvider";
 import { getData } from "../../core/context/userContext";
 import {
   DropdownMenu,
@@ -60,7 +56,6 @@ const Board: React.FC = () => {
 
   const { toolbarRef, getToolOptionsStyle } = useDragToolBar();
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
   const { user, isAuthenticated, logout } = getData();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -255,39 +250,6 @@ const Board: React.FC = () => {
             <DropdownMenuItem onClick={handleDashboard} className="cursor-pointer">
               <FaHome className="mr-2" />
               <span>Dashboard</span>
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator />
-
-            <DropdownMenuLabel className="text-xs text-gray-500">
-              Theme
-            </DropdownMenuLabel>
-
-            <DropdownMenuItem
-              onClick={() => setTheme("light")}
-              className="cursor-pointer"
-            >
-              <FaSun className="mr-2" />
-              <span>Light</span>
-              {theme === "light" && <FaCheck className="ml-auto text-blue-500" />}
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              onClick={() => setTheme("dark")}
-              className="cursor-pointer"
-            >
-              <FaMoon className="mr-2" />
-              <span>Dark</span>
-              {theme === "dark" && <FaCheck className="ml-auto text-blue-500" />}
-            </DropdownMenuItem>
-
-            <DropdownMenuItem
-              onClick={() => setTheme("system")}
-              className="cursor-pointer"
-            >
-              <FaDesktop className="mr-2" />
-              <span>System</span>
-              {theme === "system" && <FaCheck className="ml-auto text-blue-500" />}
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
