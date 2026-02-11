@@ -185,17 +185,17 @@ export function useFabricCanvas({
 
     canvas.forEachObject((obj) => {
       const currentStroke = obj.stroke as string;
-      
+
       if (!currentStroke) return;
-      
+
       // Normalize color to lowercase for comparison
       const normalizedStroke = currentStroke.toLowerCase().trim();
-      
+
       // Invert black to white
       if (normalizedStroke === '#000000' || normalizedStroke === '#000' || normalizedStroke === 'black') {
         obj.set({ stroke: '#FFFFFF' });
         hasChanges = true;
-      } 
+      }
       // Invert white to black
       else if (normalizedStroke === '#ffffff' || normalizedStroke === '#fff' || normalizedStroke === 'white') {
         obj.set({ stroke: '#000000' });
@@ -205,7 +205,7 @@ export function useFabricCanvas({
 
     if (hasChanges) {
       canvas.renderAll();
-      
+
       // Save to history after inverting colors
       setTimeout(() => {
         saveHistory();
@@ -429,19 +429,21 @@ export function useFabricCanvas({
     ---------------------------------- */
       // Make all objects selectable ONLY when in select mode
       // OR when in a drawing tool mode (so we can see the active selection)
-      const shouldMakeSelectable =
-        _tool === "select" ||
-        _tool === "rect" ||
-        _tool === "circle" ||
-        _tool === "line";
+      const shouldMakeSelectable = _tool === "select";
 
       canvas.forEachObject((obj) => {
         obj.selectable = shouldMakeSelectable;
         obj.evented = shouldMakeSelectable;
         obj.hoverCursor = shouldMakeSelectable ? "move" : "default";
-        obj.hasControls = _tool === "select"; // Show controls only in select mode
+        obj.hasControls = shouldMakeSelectable; // Show controls only in select mode
         obj.hasBorders = shouldMakeSelectable;
       });
+
+      // Always discard active object when switching tools, unless we are in select mode
+      if (_tool !== "select") {
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+      }
 
       if (!canvas.freeDrawingBrush) {
         canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
@@ -455,9 +457,7 @@ export function useFabricCanvas({
 
       // Don't discard active selection when switching between drawing tools
       // Only discard when switching to non-selectable tools
-      if (_tool !== "select" && !shouldMakeSelectable) {
-        canvas.discardActiveObject();
-      }
+
 
       canvas.renderAll();
 
@@ -509,7 +509,7 @@ export function useFabricCanvas({
           const objBounds = obj.getBoundingRect();
           const distance = Math.sqrt(
             Math.pow(cursorX - (objBounds.left + objBounds.width / 2), 2) +
-              Math.pow(cursorY - (objBounds.top + objBounds.height / 2), 2),
+            Math.pow(cursorY - (objBounds.top + objBounds.height / 2), 2),
           );
 
           // Check if cursor circle intersects with object
