@@ -14,6 +14,7 @@ import {
   FaDesktop,
   FaSignInAlt,
   FaSignOutAlt,
+  FaTrash,
 } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { useDragToolBar } from "../hooks/useDragToolBar";
@@ -50,7 +51,6 @@ const Board: React.FC = () => {
     handleUndo,
     handleRedo,
     handleClear,
-    handleSave,
     handleToolChange,
     toolsWithOptions,
     activeDrawingTool,
@@ -226,72 +226,6 @@ const Board: React.FC = () => {
               ))}
             </div>
           </div>
-
-          {/* Undo/Redo Buttons */}
-          <div className="mb-4">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleUndo}
-                className="flex-1 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors font-medium flex items-center justify-center space-x-2"
-                title="Undo"
-              >
-                <FaUndo className="w-4 h-4" />
-                <span>Undo</span>
-              </button>
-
-              <button
-                onClick={handleRedo}
-                className="flex-1 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors font-medium flex items-center justify-center space-x-2"
-                title="Redo"
-              >
-                <FaRedo className="w-4 h-4" />
-                <span>Redo</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="mb-4 flex items-center justify-center space-x-2">
-            <button
-              onClick={handleClear}
-              className="px-2 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center justify-center space-x-2"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-              <span>Clear Canvas</span>
-            </button>
-
-            <button
-              onClick={handleSave}
-              className="px-2 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium flex items-center justify-center space-x-2"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-                />
-              </svg>
-              <span>Save Now</span>
-            </button>
-          </div>
         </div>
       )}
 
@@ -356,6 +290,14 @@ const Board: React.FC = () => {
 
             <DropdownMenuSeparator />
 
+            <DropdownMenuItem onClick={handleClear}
+              className="cursor-pointer">
+              <FaTrash className="w-4 h-4" />
+              <span>Clear Canvas</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
             {isAuthenticated ? (<DropdownMenuItem
               onClick={handleLogout}
               className="cursor-pointer text-blue-400"
@@ -372,31 +314,53 @@ const Board: React.FC = () => {
         </DropdownMenu>
       </div>
 
-      {/* Zoom Controls - Bottom Left */}
-      <div className="fixed bottom-4 left-4 z-50 flex items-center space-x-1 bg-card border-2 border-border rounded-lg shadow-lg p-2">
-        <button
-          onClick={handleZoomOut}
-          className="p-1 hover:bg-accent rounded transition-colors"
-          title="Zoom Out"
-        >
-          <FaSearchMinus className="text-card-foreground" />
-        </button>
+      {/* Zoom and Undo/Redo Controls - Bottom Left */}
+      <div className="fixed bottom-4 left-4 z-50 flex items-center space-x-3">
+        {/* Zoom Controls */}
+        <div className="flex items-center space-x-1 bg-card border-2 border-border rounded-lg shadow-lg p-2">
+          <button
+            onClick={handleZoomOut}
+            className="p-1 hover:bg-accent rounded transition-colors"
+            title="Zoom Out"
+          >
+            <FaSearchMinus className="text-card-foreground" />
+          </button>
 
-        <button
-          onClick={handleResetZoom}
-          className="text-sm text-card-foreground font-medium min-w-[60px] text-center px-2 py-1 hover:bg-accent rounded transition-colors"
-          title="Reset Zoom"
-        >
-          {Math.round(zoom * 100)}%
-        </button>
+          <button
+            onClick={handleResetZoom}
+            className="text-sm text-card-foreground font-medium min-w-[60px] text-center px-2 py-1 hover:bg-accent rounded transition-colors"
+            title="Reset Zoom"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
 
-        <button
-          onClick={handleZoomIn}
-          className="p-1 hover:bg-accent rounded transition-colors"
-          title="Zoom In"
-        >
-          <FaSearchPlus className="text-card-foreground" />
-        </button>
+          <button
+            onClick={handleZoomIn}
+            className="p-1 hover:bg-accent rounded transition-colors"
+            title="Zoom In"
+          >
+            <FaSearchPlus className="text-card-foreground" />
+          </button>
+        </div>
+
+        {/* Undo/Redo Controls */}
+        <div className="flex items-center space-x-1 bg-card border-2 border-border rounded-lg shadow-lg p-2">
+          <button
+            onClick={handleUndo}
+            className="p-1 hover:bg-accent rounded transition-colors"
+            title="Undo"
+          >
+            <FaUndo className="text-card-foreground" />
+          </button>
+
+          <button
+            onClick={handleRedo}
+            className="p-1 hover:bg-accent rounded transition-colors"
+            title="Redo"
+          >
+            <FaRedo className="text-card-foreground" />
+          </button>
+        </div>
       </div>
 
       {/* Save Status Indicator */}
