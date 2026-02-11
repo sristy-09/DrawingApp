@@ -10,12 +10,21 @@ export type Tool =
   | "line";
 export type SaveStatus = "idle" | "saving" | "saved";
 
+export interface Page {
+  id: string;
+  name: string;
+  canvasData: string;
+  thumbnail?: string;
+  createdAt?: Date;
+}
+
 export interface Board {
   _id: string;
   title: string;
   description?: string;
   canvasData?: string;
   thumbnail?: string;
+  pages?: Page[];
   isPublic: boolean;
   owner: { username: string };
 }
@@ -28,8 +37,8 @@ export interface FabricCanvasRef {
     brushWidth: number;
     tool: Tool;
   }) => void;
-  loadFromJson: (json: string) => void; //  Load canvas data
-  saveToJson: () => string; // Serialize to JSON
+  loadFromJson: (json: string) => void;
+  saveToJson: () => string;
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
@@ -37,6 +46,8 @@ export interface FabricCanvasRef {
   getThumbnail: (width?: number, height?: number) => string;
   undo: () => void;
   redo: () => void;
+  saveCurrentPageState: () => void;
+  loadPageState: (canvasData: string) => void;
 }
 
 export interface FabricCanvasProps {
@@ -45,6 +56,7 @@ export interface FabricCanvasProps {
   tool: Tool;
   loadJson?: string;
   onToolChange?: (tool: Tool) => void;
+  currentPageId?: string;
 }
 
 export interface ToolbarProps {

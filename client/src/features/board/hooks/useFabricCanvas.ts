@@ -7,11 +7,13 @@ export function useFabricCanvas({
   brushWidth,
   tool,
   onToolChange,
+  currentPageId,
 }: {
   color: string;
   brushWidth: number;
   tool: Tool;
-  onToolChange?: (tool: Tool) => void; // Optional callback to update tool state
+  onToolChange?: (tool: Tool) => void;
+  currentPageId?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasInstance = useRef<fabric.Canvas | null>(null);
@@ -33,10 +35,18 @@ export function useFabricCanvas({
   const eraserCircleRef = useRef<fabric.Circle | null>(null);
   const isErasingRef = useRef<boolean>(false);
 
-  // UNDO/REDO STATE
-  const historyRef = useRef<string[]>([]);
-  const historyIndexRef = useRef<number>(-1);
+  // UNDO/REDO STATE - Per-page history
+  const pageHistoriesRef = useRef<Map<string, { history: string[]; index: number }>>(new Map());
   const isUndoRedoRef = useRef<boolean>(false);
+
+  // Get current page's history
+  const getCurrentPageHistory = useCallback(() => {
+    const pageId = currentPageId || 'default';
+    if (!pageHistoriesRef.current.has(pageId)) {
+      pageHistoriesRef.current.set(pageId, { history: [], index: -1 });
+    }
+    return pageHistoriesRef.current.get(pageId)!;
+  }, [currentPageId]);
 
   // Get canvas background color based on theme
   const getCanvasBackgroundColor = useCallback(() => {
@@ -74,33 +84,35 @@ export function useFabricCanvas({
       }
       const state = JSON.stringify(json);
 
+      const pageHistory = getCurrentPageHistory();
+
       // Don't save if state hasn't changed
-      const lastState = historyRef.current[historyIndexRef.current];
+      const lastState = pageHistory.history[pageHistory.index];
       if (lastState === state) {
         return;
       }
 
       // Remove any redo states
-      if (historyIndexRef.current < historyRef.current.length - 1) {
-        historyRef.current = historyRef.current.slice(
+      if (pageHistory.index < pageHistory.history.length - 1) {
+        pageHistory.history = pageHistory.history.slice(
           0,
-          historyIndexRef.current + 1,
+          pageHistory.index + 1,
         );
       }
 
       // Add new state
-      historyRef.current.push(state);
-      historyIndexRef.current++;
+      pageHistory.history.push(state);
+      pageHistory.index++;
 
       // Limit history to 50 states
-      if (historyRef.current.length > 50) {
-        historyRef.current.shift();
-        historyIndexRef.current--;
+      if (pageHistory.history.length > 50) {
+        pageHistory.history.shift();
+        pageHistory.index--;
       }
     } catch (error) {
       console.error("❌ Error saving history:", error);
     }
-  }, []);
+  }, [getCurrentPageHistory]);
 
   // ===== UNDO FUNCTION =====
   const undo = useCallback(() => {
@@ -110,15 +122,17 @@ export function useFabricCanvas({
       return;
     }
 
+    const pageHistory = getCurrentPageHistory();
+
     // No more undo states
-    if (historyIndexRef.current <= 0) {
+    if (pageHistory.index <= 0) {
       return;
     }
 
     isUndoRedoRef.current = true;
-    historyIndexRef.current--;
+    pageHistory.index--;
 
-    const state = historyRef.current[historyIndexRef.current];
+    const state = pageHistory.history[pageHistory.index];
 
     try {
       const stateObj = JSON.parse(state);
@@ -135,9 +149,9 @@ export function useFabricCanvas({
     } catch (error) {
       console.error("❌ Undo error:", error);
       isUndoRedoRef.current = false;
-      historyIndexRef.current++; // Restore index on error
+      pageHistory.index++; // Restore index on error
     }
-  }, []);
+  }, [getCurrentPageHistory]);
 
   // ===== REDO FUNCTION =====
   const redo = useCallback(() => {
@@ -147,15 +161,17 @@ export function useFabricCanvas({
       return;
     }
 
+    const pageHistory = getCurrentPageHistory();
+
     // No more redo states
-    if (historyIndexRef.current >= historyRef.current.length - 1) {
+    if (pageHistory.index >= pageHistory.history.length - 1) {
       return;
     }
 
     isUndoRedoRef.current = true;
-    historyIndexRef.current++;
+    pageHistory.index++;
 
-    const state = historyRef.current[historyIndexRef.current];
+    const state = pageHistory.history[pageHistory.index];
 
     try {
       const stateObj = JSON.parse(state);
@@ -172,9 +188,9 @@ export function useFabricCanvas({
     } catch (error) {
       console.error("❌ Redo error:", error);
       isUndoRedoRef.current = false;
-      historyIndexRef.current--; // Restore index on error
+      pageHistory.index--; // Restore index on error
     }
-  }, []);
+  }, [getCurrentPageHistory]);
 
   // ===== INVERT STROKE COLORS =====
   const invertStrokeColors = useCallback(() => {
@@ -346,15 +362,16 @@ export function useFabricCanvas({
 
     canvas.clear();
 
-    // Clear history
-    historyRef.current = [];
-    historyIndexRef.current = -1;
+    // Clear current page's history
+    const pageHistory = getCurrentPageHistory();
+    pageHistory.history = [];
+    pageHistory.index = -1;
 
     // Save empty state
     setTimeout(() => {
       saveHistory();
     }, 100);
-  }, [saveHistory]);
+  }, [saveHistory, getCurrentPageHistory]);
 
   // -----------------------------
   // GET CANVAS INSTANCE
@@ -827,9 +844,6 @@ export function useFabricCanvas({
     const canvas = canvasInstance.current;
     if (!canvas) return;
 
-    // Don't save history during load
-    // isUndoRedoRef.current = true;
-
     // Disable render during load
     canvas.renderOnAddRemove = false;
 
@@ -837,9 +851,10 @@ export function useFabricCanvas({
       canvas.renderOnAddRemove = true;
       canvas.renderAll();
 
-      // Reset history with loaded state
-      historyRef.current = [];
-      historyIndexRef.current = -1;
+      // Reset current page's history with loaded state
+      const pageHistory = getCurrentPageHistory();
+      pageHistory.history = [];
+      pageHistory.index = -1;
 
       try {
         const canvasJSON = canvas.toJSON();
@@ -850,11 +865,49 @@ export function useFabricCanvas({
         }
         const state = JSON.stringify(canvasJSON);
 
-        historyRef.current.push(state);
-        historyIndexRef.current = 0;
+        pageHistory.history.push(state);
+        pageHistory.index = 0;
       } catch (error) {
         console.error("❌ Error saving initial state:", error);
       }
+    });
+  }, [getCurrentPageHistory]);
+
+  // Save current page state (for page switching)
+  const saveCurrentPageState = useCallback(() => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    const pageHistory = getCurrentPageHistory();
+    
+    try {
+      const json = canvas.toJSON();
+      if (json.objects) {
+        json.objects = json.objects.filter(
+          (obj: any) => !obj.excludeFromExport,
+        );
+      }
+      const state = JSON.stringify(json);
+
+      // Update current history state
+      if (pageHistory.index >= 0) {
+        pageHistory.history[pageHistory.index] = state;
+      }
+    } catch (error) {
+      console.error("❌ Error saving page state:", error);
+    }
+  }, [getCurrentPageHistory]);
+
+  // Load page state (for page switching)
+  const loadPageState = useCallback((canvasData: string) => {
+    const canvas = canvasInstance.current;
+    if (!canvas) return;
+
+    canvas.renderOnAddRemove = false;
+
+    canvas.loadFromJSON(canvasData, () => {
+      canvas.renderOnAddRemove = true;
+      canvas.renderAll();
     });
   }, []);
 
@@ -993,5 +1046,7 @@ export function useFabricCanvas({
     getThumbnail,
     undo,
     redo,
+    saveCurrentPageState,
+    loadPageState,
   };
 }

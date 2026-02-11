@@ -38,6 +38,30 @@ const boardSchema = new mongoose.Schema({
     type: String,
     default: "{}",
   },
+  pages: [
+    {
+      id: {
+        type: String,
+        required: true,
+      },
+      name: {
+        type: String,
+        default: "Page 1",
+      },
+      canvasData: {
+        type: String,
+        default: "{}",
+      },
+      thumbnail: {
+        type: String,
+        default: "",
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
   isPublic: {
     type: Boolean,
     default: true,

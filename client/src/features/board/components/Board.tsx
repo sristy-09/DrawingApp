@@ -13,6 +13,8 @@ import {
   FaSignOutAlt,
   FaTrash,
   FaSave,
+  FaPlus,
+  FaFile,
 } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { useDragToolBar } from "../hooks/useDragToolBar";
@@ -25,6 +27,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "../../core/components/ui/dropdown-menu";
 
 const Board: React.FC = () => {
@@ -52,6 +57,10 @@ const Board: React.FC = () => {
     handleToolChange,
     toolsWithOptions,
     activeDrawingTool,
+    pages,
+    currentPageId,
+    handleAddPage,
+    handleSwitchPage,
   } = useBoard();
 
   const { toolbarRef, getToolOptionsStyle } = useDragToolBar();
@@ -126,6 +135,7 @@ const Board: React.FC = () => {
         brushWidth={brushWidth}
         tool={tool}
         onToolChange={handleToolChange}
+        currentPageId={currentPageId}
       />
 
       {/* Tool Options Panel (Excalidraw-style) */}
@@ -266,6 +276,38 @@ const Board: React.FC = () => {
               <span>Save</span>
             </DropdownMenuItem>
 
+            {isAuthenticated && pages.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <FaFile className="w-4 h-4" />
+                    <span>Pages ({pages.length})</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {pages.map((page, index) => (
+                      <DropdownMenuItem
+                        key={page.id}
+                        onClick={() => handleSwitchPage(page.id)}
+                        className={`cursor-pointer ${currentPageId === page.id ? "bg-accent" : ""
+                          }`}
+                      >
+                        <span>
+                          {index + 1}. {page.name}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleAddPage} className="cursor-pointer">
+                      <FaPlus className="w-4 h-4" />
+                      <span>Add Page</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </>
+            )}
+
             <DropdownMenuSeparator />
 
             {isAuthenticated ? (<DropdownMenuItem
@@ -332,6 +374,34 @@ const Board: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Page Navigation - Bottom Center (Only for authenticated users) */}
+      {isAuthenticated && pages.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="flex items-center space-x-2 bg-card border-2 border-border rounded-lg shadow-lg p-2">
+            {pages.map((page, index) => (
+              <button
+                key={page.id}
+                onClick={() => handleSwitchPage(page.id)}
+                className={`px-3 py-1 rounded transition-colors text-sm ${currentPageId === page.id
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-accent text-card-foreground"
+                  }`}
+                title={page.name}
+              >
+                {index + 1}
+              </button>
+            ))}
+            <button
+              onClick={handleAddPage}
+              className="px-3 py-1 rounded hover:bg-accent text-card-foreground transition-colors text-sm"
+              title="Add Page"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Save Status Indicator */}
       <div className="fixed bottom-4 right-4 z-50">

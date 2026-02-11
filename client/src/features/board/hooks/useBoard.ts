@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import type { FabricCanvasRef, Tool } from "../types/types";
+import type { FabricCanvasRef, Tool, Page } from "../types/types";
 import { useParams } from "react-router";
 import axios from "axios";
 import { debounce } from "lodash";
@@ -22,11 +22,15 @@ export function useBoard() {
   const [color, setColor] = useState<string>(getDefaultColor());
   const [brushWidth, setBrushWidth] = useState<number>(3);
   const [tool, setTool] = useState<Tool>("eraser");
-  const [activeDrawingTool, setActiveDrawingTool] = useState<Tool>("eraser"); // Track which drawing tool is active
+  const [activeDrawingTool, setActiveDrawingTool] = useState<Tool>("eraser");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
     "idle",
   );
   const [zoom, setZoom] = useState<number>(1);
+  
+  // Multi-page state
+  const [pages, setPages] = useState<Page[]>([]);
+  const [currentPageId, setCurrentPageId] = useState<string>("page-1");
   
   // Redux
   const dispatch = useAppDispatch();
@@ -149,7 +153,7 @@ export function useBoard() {
       return;
     }
 
-    // GUEST USER: Save to Redux/localStorage
+    // GUEST USER: Save to Redux/localStorage (no multi-page for guests)
     if (!isAuthenticated) {
       dispatch(setCanvasData(json));
       lastSavedDataRef.current = json;
@@ -158,13 +162,14 @@ export function useBoard() {
       return;
     }
 
-    // AUTHENTICATED USER: Save to backend
+    // AUTHENTICATED USER: Save to backend with multi-page support
     isSavingRef.current = true;
     setSaveStatus("saving");
 
     try {
-      const payload: { canvasData: string; thumbnail?: string } = {
+      const payload: { canvasData?: string; thumbnail?: string; currentPageId?: string } = {
         canvasData: json,
+        currentPageId: currentPageId,
       };
 
       // Add thumbnail if requested
@@ -225,9 +230,11 @@ export function useBoard() {
   // Load board data
   useEffect(() => {
     const loadBoard = async () => {
-      // GUEST USER: Load from Redux/localStorage
+      // GUEST USER: Load from Redux/localStorage (no multi-page)
       if (!isAuthenticated) {
         dispatch(loadGuestBoardData());
+        setPages([]);
+        setCurrentPageId("default");
         
         // Wait for Redux state to update
         setTimeout(() => {
@@ -243,19 +250,41 @@ export function useBoard() {
         return;
       }
 
-      // AUTHENTICATED USER: Load from backend
+      // AUTHENTICATED USER: Load from backend with multi-page support
       try {
         const res = await axios.get(`${API_URL}/board/${id}`);
-        const json = res.data.canvasData;
+        const boardData = res.data;
 
-        if (json && canvasRef.current?.loadFromJson) {
-          canvasRef.current.loadFromJson(json);
-          lastSavedDataRef.current = json;
-
-          setTimeout(() => {
-            canvasRef.current?.applySettings?.({ color, brushWidth, tool });
-          }, 50);
+        // Check if board has pages
+        if (boardData.pages && boardData.pages.length > 0) {
+          setPages(boardData.pages);
+          setCurrentPageId(boardData.pages[0].id);
+          
+          const firstPage = boardData.pages[0];
+          if (firstPage.canvasData && canvasRef.current?.loadFromJson) {
+            canvasRef.current.loadFromJson(firstPage.canvasData);
+            lastSavedDataRef.current = firstPage.canvasData;
+          }
+        } else {
+          // Legacy board without pages - migrate to page structure
+          const legacyPage: Page = {
+            id: "page-1",
+            name: "Page 1",
+            canvasData: boardData.canvasData || "{}",
+            thumbnail: boardData.thumbnail || "",
+          };
+          setPages([legacyPage]);
+          setCurrentPageId("page-1");
+          
+          if (boardData.canvasData && canvasRef.current?.loadFromJson) {
+            canvasRef.current.loadFromJson(boardData.canvasData);
+            lastSavedDataRef.current = boardData.canvasData;
+          }
         }
+
+        setTimeout(() => {
+          canvasRef.current?.applySettings?.({ color, brushWidth, tool });
+        }, 50);
       } catch (error) {
         console.error("Error loading board:", error);
       }
@@ -442,6 +471,115 @@ export function useBoard() {
   const handleUndo = () => canvasRef.current?.undo();
   const handleRedo = () => canvasRef.current?.redo();
 
+  // Page management functions
+  const handleAddPage = () => {
+    if (!isAuthenticated) return; // Only for authenticated users
+    
+    const newPageId = `page-${Date.now()}`;
+    const newPage: Page = {
+      id: newPageId,
+      name: `Page ${pages.length + 1}`,
+      canvasData: "{}",
+      thumbnail: "",
+    };
+    
+    // Save current page before switching
+    if (canvasRef.current) {
+      const currentJson = canvasRef.current.saveToJson();
+      const updatedPages = pages.map(p => 
+        p.id === currentPageId ? { ...p, canvasData: currentJson } : p
+      );
+      setPages([...updatedPages, newPage]);
+    } else {
+      setPages([...pages, newPage]);
+    }
+    
+    // Switch to new page
+    setCurrentPageId(newPageId);
+    
+    // Clear canvas for new page
+    if (canvasRef.current) {
+      canvasRef.current.loadFromJson("{}");
+    }
+  };
+
+  const handleSwitchPage = (pageId: string) => {
+    if (!isAuthenticated || pageId === currentPageId) return;
+    
+    // Save current page state
+    if (canvasRef.current) {
+      canvasRef.current.saveCurrentPageState?.();
+      const currentJson = canvasRef.current.saveToJson();
+      
+      const updatedPages = pages.map(p => 
+        p.id === currentPageId ? { ...p, canvasData: currentJson } : p
+      );
+      setPages(updatedPages);
+    }
+    
+    // Load new page
+    const targetPage = pages.find(p => p.id === pageId);
+    if (targetPage && canvasRef.current) {
+      setCurrentPageId(pageId);
+      canvasRef.current.loadPageState?.(targetPage.canvasData || "{}");
+      lastSavedDataRef.current = targetPage.canvasData || "{}";
+    }
+  };
+
+  const handleDeletePage = (pageId: string) => {
+    if (!isAuthenticated || pages.length <= 1) return; // Keep at least one page
+    
+    const updatedPages = pages.filter(p => p.id !== pageId);
+    setPages(updatedPages);
+    
+    // If deleting current page, switch to first page
+    if (pageId === currentPageId && updatedPages.length > 0) {
+      const firstPage = updatedPages[0];
+      setCurrentPageId(firstPage.id);
+      if (canvasRef.current) {
+        canvasRef.current.loadPageState?.(firstPage.canvasData || "{}");
+      }
+    }
+  };
+
+  const handleRenamePage = (pageId: string, newName: string) => {
+    if (!isAuthenticated) return;
+    
+    const updatedPages = pages.map(p => 
+      p.id === pageId ? { ...p, name: newName } : p
+    );
+    setPages(updatedPages);
+  };
+
+  // Save all pages to backend
+  const saveAllPages = async () => {
+    if (!isAuthenticated || !canvasRef.current) return;
+    
+    // Update current page data
+    const currentJson = canvasRef.current.saveToJson();
+    const updatedPages = pages.map(p => 
+      p.id === currentPageId ? { ...p, canvasData: currentJson } : p
+    );
+    
+    try {
+      await axios.patch(`${API_URL}/board/${id}`, { pages: updatedPages });
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (error) {
+      console.error("❌ Error saving pages:", error);
+    }
+  };
+
+  // Auto-save pages when they change
+  useEffect(() => {
+    if (isAuthenticated && pages.length > 0) {
+      const timer = setTimeout(() => {
+        saveAllPages();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [pages, currentPageId, isAuthenticated]);
+
   return {
     canvasRef,
     color,
@@ -450,8 +588,8 @@ export function useBoard() {
     showToolOptions,
     setShowToolOptions,
     toolOptionsRef,
-    tool, // Current active tool (for toolbar highlight)
-    activeDrawingTool, // Last drawing tool (for popup content)
+    tool,
+    activeDrawingTool,
     setTool,
     setColor: handleColorChange,
     setBrushWidth: handleBrushWidthChange,
@@ -468,5 +606,13 @@ export function useBoard() {
     handleSave,
     handleToolChange,
     toolsWithOptions,
+    // Multi-page support
+    pages,
+    currentPageId,
+    handleAddPage,
+    handleSwitchPage,
+    handleDeletePage,
+    handleRenamePage,
+    saveAllPages,
   };
 }

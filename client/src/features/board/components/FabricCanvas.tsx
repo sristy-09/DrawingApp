@@ -4,18 +4,18 @@ import type { FabricCanvasProps, FabricCanvasRef, Tool } from "../types/types";
 
 const FabricCanvas = React.forwardRef(
   (
-    { color, brushWidth, tool: externalTool, onToolChange }: FabricCanvasProps,
+    { color, brushWidth, tool: externalTool, onToolChange, currentPageId }: FabricCanvasProps,
     ref: ForwardedRef<FabricCanvasRef>
   ) => {
     // Local state for tool(can be auto-switched by the hook)
     const [internalTool, setInternalTool] = useState<Tool>(externalTool)
 
     // sync internal tool with external prop when it changes
-    useEffect(()=>{
+    useEffect(() => {
       setInternalTool(externalTool);
-    },[externalTool])
+    }, [externalTool])
 
-    const handleToolChange = (newTool: Tool)=>{
+    const handleToolChange = (newTool: Tool) => {
       setInternalTool(newTool);
       // Notify parent component to update it's UI
       onToolChange?.(newTool)
@@ -34,12 +34,15 @@ const FabricCanvas = React.forwardRef(
       getZoom,
       getThumbnail,
       undo,
-      redo
+      redo,
+      saveCurrentPageState,
+      loadPageState,
     } = useFabricCanvas({
       color,
       brushWidth,
       tool: internalTool, // Use internal tool
       onToolChange: handleToolChange, // Allow hook to update tool and notify parent
+      currentPageId,
     });
 
 
@@ -56,9 +59,11 @@ const FabricCanvas = React.forwardRef(
       getZoom,
       getThumbnail,
       //optionally exposes the current tool
-      getCurrentTool:()=> internalTool,
+      getCurrentTool: () => internalTool,
       undo,
       redo,
+      saveCurrentPageState,
+      loadPageState,
     }));
 
     return <canvas ref={canvasRef} className="border w-screen h-screen" />;

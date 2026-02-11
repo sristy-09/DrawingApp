@@ -19,6 +19,14 @@ export const createBoard = async (req, res) => {
       isPublic,
       canvasData,
       thumbnail,
+      pages: [
+        {
+          id: "page-1",
+          name: "Page 1",
+          canvasData: canvasData || "{}",
+          thumbnail: thumbnail || "",
+        },
+      ],
     });
 
     await board.save();
@@ -84,7 +92,7 @@ export const getBoardById = async (req, res) => {
 export const updateBoard = async (req, res) => {
   try {
     const { id } = req.params;
-    const { canvasData, title, description, thumbnail, isPublic } = req.body; // Allow partial updates
+    const { canvasData, title, description, thumbnail, isPublic, pages, currentPageId } = req.body;
 
     const board = await Board.findById(id)
       .populate("owner", "username email avatar")
@@ -94,7 +102,7 @@ export const updateBoard = async (req, res) => {
       return res.status(404).json({ message: "Board not found" });
     }
 
-    // Auth check(already in middleware, but reinforce)
+    // Auth check
     const isOwner = board.owner._id.equals(req.user.id);
     const isCollaborator = board.collaborators.some((c) =>
       c.user._id.equals(req.user.id)
@@ -105,13 +113,40 @@ export const updateBoard = async (req, res) => {
         .json({ message: "You don't have permission to edit this board" });
     }
 
+    // Migrate old boards to pages structure if needed
+    if (!board.pages || board.pages.length === 0) {
+      board.pages = [
+        {
+          id: "page-1",
+          name: "Page 1",
+          canvasData: board.canvasData || "{}",
+          thumbnail: board.thumbnail || "",
+        },
+      ];
+    }
+
     // Update fields if provided
-    if (canvasData !== undefined) board.canvasData = canvasData;
+    if (pages !== undefined) {
+      board.pages = pages;
+    } else if (currentPageId && canvasData !== undefined) {
+      // Update specific page
+      const pageIndex = board.pages.findIndex((p) => p.id === currentPageId);
+      if (pageIndex !== -1) {
+        board.pages[pageIndex].canvasData = canvasData;
+        if (thumbnail !== undefined) {
+          board.pages[pageIndex].thumbnail = thumbnail;
+        }
+      }
+    } else if (canvasData !== undefined) {
+      // Fallback: update legacy canvasData
+      board.canvasData = canvasData;
+    }
+
     if (title !== undefined) board.title = title;
     if (description !== undefined) board.description = description;
-    if (thumbnail !== undefined) board.thumbnail = thumbnail;
+    if (thumbnail !== undefined && !currentPageId) board.thumbnail = thumbnail;
     if (isPublic !== undefined) board.isPublic = isPublic;
-    board.updatedAt = Date.now(); // Auto-update timestamp
+    board.updatedAt = Date.now();
 
     await board.save();
 
