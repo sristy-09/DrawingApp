@@ -15,6 +15,7 @@ import {
   FaSignInAlt,
   FaSignOutAlt,
   FaTrash,
+  FaSave,
 } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { useDragToolBar } from "../hooks/useDragToolBar";
@@ -51,6 +52,7 @@ const Board: React.FC = () => {
     handleUndo,
     handleRedo,
     handleClear,
+    handleSave,
     handleToolChange,
     toolsWithOptions,
     activeDrawingTool,
@@ -294,6 +296,12 @@ const Board: React.FC = () => {
               className="cursor-pointer">
               <FaTrash className="w-4 h-4" />
               <span>Clear Canvas</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem onClick={handleSave}
+              className="cursor-pointer">
+              <FaSave className="w-4 h-4" />
+              <span>Save</span>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
