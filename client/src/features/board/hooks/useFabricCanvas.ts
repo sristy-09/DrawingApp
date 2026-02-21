@@ -192,42 +192,6 @@ export function useFabricCanvas({
     }
   }, [getCurrentPageHistory]);
 
-  // ===== INVERT STROKE COLORS =====
-  const invertStrokeColors = useCallback(() => {
-    const canvas = canvasInstance.current;
-    if (!canvas) return;
-
-    let hasChanges = false;
-
-    canvas.forEachObject((obj) => {
-      const currentStroke = obj.stroke as string;
-
-      if (!currentStroke) return;
-
-      // Normalize color to lowercase for comparison
-      const normalizedStroke = currentStroke.toLowerCase().trim();
-
-      // Invert black to white
-      if (normalizedStroke === '#000000' || normalizedStroke === '#000' || normalizedStroke === 'black') {
-        obj.set({ stroke: '#FFFFFF' });
-        hasChanges = true;
-      }
-      // Invert white to black
-      else if (normalizedStroke === '#ffffff' || normalizedStroke === '#fff' || normalizedStroke === 'white') {
-        obj.set({ stroke: '#000000' });
-        hasChanges = true;
-      }
-    });
-
-    if (hasChanges) {
-      canvas.renderAll();
-
-      // Save to history after inverting colors
-      setTimeout(() => {
-        saveHistory();
-      }, 100);
-    }
-  }, [saveHistory]);
 
   function cleanupToolHandlers(canvas: fabric.Canvas) {
     const h = activeToolHandlersRef.current;
@@ -879,7 +843,7 @@ export function useFabricCanvas({
     if (!canvas) return;
 
     const pageHistory = getCurrentPageHistory();
-    
+
     try {
       const json = canvas.toJSON();
       if (json.objects) {
@@ -926,31 +890,10 @@ export function useFabricCanvas({
 
     canvasInstance.current = fab;
 
-    // Initialize theme tracking
-    previousThemeRef.current = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 
-    // Update canvas background when theme changes
-    const updateCanvasTheme = () => {
-      if (fab && hasThemeChanged()) {
-        fab.backgroundColor = getCanvasBackgroundColor();
-        invertStrokeColors();
-        fab.renderAll();
-      }
-    };
 
-    // Listen for theme changes
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'class') {
-          updateCanvasTheme();
-        }
-      });
-    });
 
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
+
 
     const resize = () => {
       el.width = window.innerWidth;
@@ -1011,7 +954,6 @@ export function useFabricCanvas({
     }, 300);
 
     return () => {
-      observer.disconnect();
       fab.off("object:added", handleHistoryEvent);
       fab.off("object:modified", handleHistoryEvent);
       fab.off("object:removed", handleHistoryEvent);
@@ -1022,7 +964,7 @@ export function useFabricCanvas({
       fab.dispose();
       canvasInstance.current = null;
     };
-  }, [saveHistory, getCanvasBackgroundColor, invertStrokeColors, hasThemeChanged]);
+  }, [saveHistory, getCanvasBackgroundColor, hasThemeChanged]);
 
   // -----------------------------
   // UPDATE SETTINGS WHEN PROPS CHANGE

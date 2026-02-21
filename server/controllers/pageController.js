@@ -5,7 +5,7 @@ import mongoose from "mongoose";
 // Helper: Check if user has access to board
 const checkBoardAccess = async (boardId, userId, requireEditor = false) => {
   const board = await Board.findById(boardId);
-  
+
   if (!board) {
     return { hasAccess: false, error: "Board not found", status: 404 };
   }
@@ -95,12 +95,12 @@ export const createPage = async (req, res) => {
 
     // Add page reference to board
     board.pages.push(newPage._id);
-    
+
     // Set as current page if it's the first page
     if (board.pages.length === 1) {
       board.currentPageId = newPage._id;
     }
-    
+
     await board.save();
 
     res.status(201).json(newPage);
@@ -160,7 +160,7 @@ export const updatePageCanvas = async (req, res) => {
     // Use findOneAndUpdate for atomic operation
     const page = await Page.findOneAndUpdate(
       { _id: pageId, board: boardId },
-      { 
+      {
         canvasData,
         ...(thumbnail && { thumbnail }),
         updatedAt: Date.now()
@@ -215,9 +215,9 @@ export const deletePage = async (req, res) => {
     // Delete the page
     await Page.findByIdAndDelete(pageId);
 
-    res.json({ 
+    res.json({
       message: "Page deleted successfully",
-      newCurrentPageId: board.currentPageId 
+      newCurrentPageId: board.currentPageId
     });
   } catch (error) {
     console.error("Delete page error:", error);
