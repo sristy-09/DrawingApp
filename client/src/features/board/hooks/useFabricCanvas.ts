@@ -38,6 +38,7 @@ export function useFabricCanvas({
   // UNDO/REDO STATE - Per-page history
   const pageHistoriesRef = useRef<Map<string, { history: string[]; index: number }>>(new Map());
   const isUndoRedoRef = useRef<boolean>(false);
+  const isLoadingPageRef = useRef<boolean>(false); // Guard for page switching
 
   // Get current page's history
   const getCurrentPageHistory = useCallback(() => {
@@ -69,8 +70,8 @@ export function useFabricCanvas({
       return;
     }
 
-    // Undo/redo in progress, skip saving
-    if (isUndoRedoRef.current) {
+    // Skip saving during undo/redo or page loading
+    if (isUndoRedoRef.current || isLoadingPageRef.current) {
       return;
     }
 
@@ -113,6 +114,13 @@ export function useFabricCanvas({
       console.error("❌ Error saving history:", error);
     }
   }, [getCurrentPageHistory]);
+
+  // Stable ref for saveHistory — allows mount effect to always call
+  // the latest saveHistory without depending on it (preventing canvas re-creation)
+  const saveHistoryRef = useRef(saveHistory);
+  useEffect(() => {
+    saveHistoryRef.current = saveHistory;
+  }, [saveHistory]);
 
   // ===== UNDO FUNCTION =====
   const undo = useCallback(() => {
@@ -808,6 +816,10 @@ export function useFabricCanvas({
     const canvas = canvasInstance.current;
     if (!canvas) return;
 
+    // Guard: suppress event-driven history saves during load
+    isLoadingPageRef.current = true;
+    isUndoRedoRef.current = true;
+
     // Disable render during load
     canvas.renderOnAddRemove = false;
 
@@ -834,6 +846,12 @@ export function useFabricCanvas({
       } catch (error) {
         console.error("❌ Error saving initial state:", error);
       }
+
+      // Re-enable history tracking after a delay
+      setTimeout(() => {
+        isUndoRedoRef.current = false;
+        isLoadingPageRef.current = false;
+      }, 150);
     });
   }, [getCurrentPageHistory]);
 
@@ -867,11 +885,21 @@ export function useFabricCanvas({
     const canvas = canvasInstance.current;
     if (!canvas) return;
 
+    // Guard: suppress all history saves during page load
+    isLoadingPageRef.current = true;
+    isUndoRedoRef.current = true;
     canvas.renderOnAddRemove = false;
 
     canvas.loadFromJSON(canvasData, () => {
       canvas.renderOnAddRemove = true;
       canvas.renderAll();
+
+      // Small delay to let any queued event handlers fire (and be suppressed)
+      // before we re-enable history tracking
+      setTimeout(() => {
+        isUndoRedoRef.current = false;
+        isLoadingPageRef.current = false;
+      }, 150);
     });
   }, []);
 
@@ -938,9 +966,8 @@ export function useFabricCanvas({
 
     const handleHistoryEvent = () => {
       setTimeout(() => {
-        if (!isUndoRedoRef.current) {
-          saveHistory();
-        } else {
+        if (!isUndoRedoRef.current && !isLoadingPageRef.current) {
+          saveHistoryRef.current();
         }
       }, 100);
     };
@@ -950,7 +977,7 @@ export function useFabricCanvas({
 
     // Save initial empty state
     setTimeout(() => {
-      saveHistory();
+      saveHistoryRef.current();
     }, 300);
 
     return () => {
@@ -964,7 +991,7 @@ export function useFabricCanvas({
       fab.dispose();
       canvasInstance.current = null;
     };
-  }, [saveHistory, getCanvasBackgroundColor, hasThemeChanged]);
+  }, [getCanvasBackgroundColor, hasThemeChanged]);  // NOTE: saveHistory removed — use saveHistoryRef instead to prevent canvas re-creation
 
   // -----------------------------
   // UPDATE SETTINGS WHEN PROPS CHANGE
