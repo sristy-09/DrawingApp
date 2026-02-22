@@ -56,12 +56,16 @@ pageSchema.pre("save", async function (next) {
       .findOne({ board: this.board })
       .sort({ order: -1 })
       .select("order");
-    
+
     if (maxOrder && this.order <= maxOrder.order) {
       this.order = maxOrder.order + 1;
     }
   }
   next();
 });
+
+// Ensure virtuals are included in JSON
+pageSchema.set("toJSON", { virtuals: true });
+pageSchema.set("toObject", { virtuals: true });
 
 export const Page = mongoose.model("Page", pageSchema);

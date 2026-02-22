@@ -15,8 +15,13 @@ import {
   FaSave,
   FaPlus,
   FaFile,
+  FaCopy,
+  FaEdit,
+  FaArrowUp,
+  FaArrowDown,
+  FaEllipsisV,
 } from "react-icons/fa";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useDragToolBar } from "../hooks/useDragToolBar";
 import { useNavigate } from "react-router";
 import { getData } from "../../core/context/userContext";
@@ -59,14 +64,27 @@ const Board: React.FC = () => {
     activeDrawingTool,
     pages,
     currentPageId,
+    isLoadingPage,
     handleAddPage,
     handleSwitchPage,
+    handleDeletePage,
+    handleRenamePage,
+    handleDuplicatePage,
+    handleReorderPages,
   } = useBoard();
 
   const { toolbarRef, getToolOptionsStyle } = useDragToolBar();
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = getData();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Page rename state
+  const [renamingPageId, setRenamingPageId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Page context menu state
+
 
   const handleLogout = () => {
     logout();
@@ -75,6 +93,38 @@ const Board: React.FC = () => {
 
   const handleDashboard = () => {
     navigate("/dashboard");
+  };
+
+  // Start rename
+  const startRename = (pageId: string, currentName: string) => {
+    setRenamingPageId(pageId);
+    setRenameValue(currentName);
+    setTimeout(() => {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }, 50);
+  };
+
+  // Commit rename
+  const commitRename = () => {
+    if (renamingPageId && renameValue.trim()) {
+      handleRenamePage(renamingPageId, renameValue.trim());
+    }
+    setRenamingPageId(null);
+    setRenameValue("");
+  };
+
+  // Move page up or down
+  const movePage = (pageId: string, direction: "up" | "down") => {
+    const idx = pages.findIndex(p => p._id === pageId);
+    if (idx < 0) return;
+    if (direction === "up" && idx === 0) return;
+    if (direction === "down" && idx === pages.length - 1) return;
+
+    const newIds = pages.map(p => p._id);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    [newIds[idx], newIds[swapIdx]] = [newIds[swapIdx], newIds[idx]];
+    handleReorderPages(newIds);
   };
 
   // Close tool options when clicking outside
@@ -137,6 +187,35 @@ const Board: React.FC = () => {
         onToolChange={handleToolChange}
         currentPageId={currentPageId}
       />
+
+      {/* Page loading overlay */}
+      {isLoadingPage && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/50 pointer-events-none">
+          <div className="flex items-center gap-2 bg-card border-2 border-border rounded-lg shadow-lg px-4 py-2">
+            <svg
+              className="animate-spin h-5 w-5 text-primary"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span className="text-sm font-medium text-card-foreground">Switching page...</span>
+          </div>
+        </div>
+      )}
 
       {/* Tool Options Panel (Excalidraw-style) */}
       {showToolOptions && toolsWithOptions.includes(activeDrawingTool) && (
@@ -285,17 +364,20 @@ const Board: React.FC = () => {
                     <FaFile className="w-4 h-4" />
                     <span>Pages ({pages.length})</span>
                   </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
+                  <DropdownMenuSubContent className="min-w-[200px]">
                     {pages.map((page, index) => (
                       <DropdownMenuItem
-                        key={page.id}
-                        onClick={() => handleSwitchPage(page.id)}
-                        className={`cursor-pointer ${currentPageId === page.id ? "bg-accent" : ""
+                        key={page._id}
+                        onClick={() => handleSwitchPage(page._id)}
+                        className={`cursor-pointer ${currentPageId === page._id ? "bg-accent" : ""
                           }`}
                       >
-                        <span>
+                        <span className="flex-1">
                           {index + 1}. {page.name}
                         </span>
+                        {currentPageId === page._id && (
+                          <span className="text-xs text-muted-foreground ml-2">●</span>
+                        )}
                       </DropdownMenuItem>
                     ))}
                     <DropdownMenuSeparator />
@@ -375,30 +457,144 @@ const Board: React.FC = () => {
         </div>
       </div>
 
-      {/* Page Navigation - Bottom Center (Only for authenticated users) */}
+      {/* Page Navigation Bar - Bottom Center (Only for authenticated users) */}
       {isAuthenticated && pages.length > 0 && (
         <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="flex items-center space-x-2 bg-card border-2 border-border rounded-lg shadow-lg p-2">
+          <div className="flex items-center space-x-1 bg-card border-2 border-border rounded-lg shadow-lg p-1.5">
             {pages.map((page, index) => (
-              <button
-                key={page.id}
-                onClick={() => handleSwitchPage(page.id)}
-                className={`px-3 py-1 rounded transition-colors text-sm ${currentPageId === page.id
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-accent text-card-foreground"
-                  }`}
-                title={page.name}
-              >
-                {index + 1}
-              </button>
+              <div key={page._id} className="relative group">
+                {/* Page button */}
+                <button
+                  onClick={() => handleSwitchPage(page._id)}
+                  disabled={isLoadingPage}
+                  className={`px-3 py-1.5 rounded transition-all text-sm font-medium min-w-[36px] ${currentPageId === page._id
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "hover:bg-accent text-card-foreground"
+                    } ${isLoadingPage ? "opacity-50 cursor-wait" : ""}`}
+                  title={page.name}
+                >
+                  {index + 1}
+                </button>
+
+                {/* Page context menu (three-dot) on hover */}
+                <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="w-4 h-4 bg-muted rounded-full flex items-center justify-center hover:bg-accent border border-border shadow-sm"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <FaEllipsisV className="text-[8px] text-muted-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="min-w-[160px]" align="center">
+                      <DropdownMenuLabel className="text-xs truncate max-w-[140px]">
+                        {page.name}
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => startRename(page._id, page.name)}
+                        className="cursor-pointer text-sm"
+                      >
+                        <FaEdit className="w-3 h-3 mr-2" />
+                        Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDuplicatePage(page._id)}
+                        className="cursor-pointer text-sm"
+                      >
+                        <FaCopy className="w-3 h-3 mr-2" />
+                        Duplicate
+                      </DropdownMenuItem>
+                      {index > 0 && (
+                        <DropdownMenuItem
+                          onClick={() => movePage(page._id, "up")}
+                          className="cursor-pointer text-sm"
+                        >
+                          <FaArrowUp className="w-3 h-3 mr-2" />
+                          Move Left
+                        </DropdownMenuItem>
+                      )}
+                      {index < pages.length - 1 && (
+                        <DropdownMenuItem
+                          onClick={() => movePage(page._id, "down")}
+                          className="cursor-pointer text-sm"
+                        >
+                          <FaArrowDown className="w-3 h-3 mr-2" />
+                          Move Right
+                        </DropdownMenuItem>
+                      )}
+                      {pages.length > 1 && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleDeletePage(page._id)}
+                            className="cursor-pointer text-sm text-red-500 focus:text-red-500"
+                          >
+                            <FaTrash className="w-3 h-3 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
             ))}
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-border mx-1" />
+
+            {/* Add page button */}
             <button
               onClick={handleAddPage}
-              className="px-3 py-1 rounded hover:bg-accent text-card-foreground transition-colors text-sm"
+              className="px-2.5 py-1.5 rounded hover:bg-accent text-card-foreground transition-colors text-sm"
               title="Add Page"
             >
-              +
+              <FaPlus className="text-xs" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Page Rename Modal */}
+      {renamingPageId && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+          onClick={() => setRenamingPageId(null)}
+        >
+          <div
+            className="bg-card border-2 border-border rounded-xl shadow-2xl p-6 min-w-[320px] max-w-[400px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-card-foreground mb-4">Rename Page</h3>
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitRename();
+                if (e.key === "Escape") setRenamingPageId(null);
+              }}
+              className="w-full px-3 py-2 border-2 border-border rounded-lg text-sm focus:outline-none focus:border-primary bg-background text-foreground mb-4"
+              placeholder="Page name"
+              maxLength={100}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setRenamingPageId(null)}
+                className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={commitRename}
+                className="px-4 py-2 rounded-lg text-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity font-medium"
+              >
+                Rename
+              </button>
+            </div>
           </div>
         </div>
       )}

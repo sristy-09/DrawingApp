@@ -1,149 +1,172 @@
 # Multi-Page Support Implementation
 
 ## Overview
-Successfully implemented multi-page support for the Fabric.js drawing board. Each board can now contain multiple pages, with each page maintaining its own canvas data and independent undo/redo history stack.
+Multi-page support for the Fabric.js drawing board. Each board contains multiple pages, with each page stored as its own MongoDB document. Pages maintain independent canvas data and undo/redo history stacks on the client.
 
 ## Key Features
 - ✅ Multiple pages per board (authenticated users only)
-- ✅ Independent canvas data for each page
-- ✅ Separate undo/redo history per page
-- ✅ Page switching without history mixing
-- ✅ Auto-save functionality for pages
-- ✅ Page navigation UI (bottom center + menu dropdown)
+- ✅ Independent canvas data for each page (stored in separate Page documents)
+- ✅ Separate undo/redo history per page (client-side)
+- ✅ Page switching without history cross-contamination
+- ✅ Auto-save via the dedicated page canvas endpoint
+- ✅ Page navigation UI (bottom center bar + hamburger menu dropdown)
+- ✅ Per-page context menu (rename, duplicate, move, delete)
 - ✅ Backward compatibility with legacy single-page boards
+- ✅ Full frontend ↔ backend synchronization via Page API
 
-## Implementation Details
+## Architecture
 
-### Backend Changes
+### Data Flow
+```
+Frontend (useBoard.ts)  ←→  Page API endpoints  ←→  Page MongoDB collection
+                        ←→  Board API endpoints ←→  Board MongoDB collection
+```
 
-#### 1. Board Model (`server/models/Board.js`)
-- Added `pages` array field to store multiple pages
-- Each page contains:
-  - `id`: Unique identifier
-  - `name`: Display name (e.g., "Page 1")
-  - `canvasData`: JSON string of canvas state
-  - `thumbnail`: Optional thumbnail image
-  - `createdAt`: Creation timestamp
-- Maintained `canvasData` field for backward compatibility
+- **Canvas data** is saved/loaded via `PATCH /board/:boardId/pages/:pageId/canvas`
+- **Page metadata** (name, order) is managed via `PATCH /board/:boardId/pages/:pageId`
+- **Board-level state** (currentPageId) is updated via `PATCH /board/:id`
+- **Pages are listed** via `GET /board/:id` (populated) or `GET /board/:boardId/pages`
 
-#### 2. Board Controller (`server/controllers/boardController.js`)
-- Updated `createBoard`: Initializes new boards with a default page
-- Updated `updateBoard`: 
-  - Handles page-specific updates via `currentPageId`
-  - Supports bulk page updates via `pages` array
-  - Migrates legacy boards to page structure automatically
+## Backend
 
-### Frontend Changes
+### Models
 
-#### 1. Types (`client/src/features/board/types/types.ts`)
-- Added `Page` interface with id, name, canvasData, thumbnail
-- Updated `Board` interface to include optional `pages` array
-- Extended `FabricCanvasRef` with:
-  - `saveCurrentPageState()`: Save current page before switching
-  - `loadPageState(canvasData)`: Load a specific page's data
-- Added `currentPageId` prop to `FabricCanvasProps`
+#### Page Model (`server/models/Page.js`)
+Each page is its own document in the `pages` collection:
+| Field | Type | Description |
+|-------|------|-------------|
+| `board` | ObjectId (ref: Board) | Parent board reference |
+| `name` | String | Display name (e.g., "Page 1") |
+| `order` | Number | Position in the page list |
+| `canvasData` | String | JSON-serialized Fabric.js canvas state |
+| `thumbnail` | String | Base64 or URL snapshot |
+| `createdAt` | Date | Immutable creation timestamp |
+| `updatedAt` | Date | Auto-updated on save |
 
-#### 2. Canvas Hook (`client/src/features/board/hooks/useFabricCanvas.ts`)
-- Replaced single history stack with per-page history map
-- `pageHistoriesRef`: Map<pageId, {history, index}>
-- `getCurrentPageHistory()`: Gets history for current page
-- Updated `saveHistory()`, `undo()`, `redo()` to use page-specific history
-- Added `saveCurrentPageState()`: Saves current canvas state to history
-- Added `loadPageState()`: Loads canvas from JSON without resetting history
+- Compound index on `{ board, order }` for efficient queries
+- Pre-save hook auto-increments `order` for new pages
+- Virtual `id` enabled via `toJSON({ virtuals: true })`
 
-#### 3. Board Hook (`client/src/features/board/hooks/useBoard.ts`)
-- Added state management:
-  - `pages`: Array of Page objects
-  - `currentPageId`: Currently active page ID
-- Page management functions:
-  - `handleAddPage()`: Creates new blank page
-  - `handleSwitchPage(pageId)`: Switches to different page, saves current state
-  - `handleDeletePage(pageId)`: Removes page (keeps at least one)
-  - `handleRenamePage(pageId, name)`: Updates page name
-  - `saveAllPages()`: Persists all pages to backend
-- Updated `saveBoard()`: Includes `currentPageId` in save payload
-- Updated load logic: Handles both legacy and multi-page boards
-- Auto-save effect: Saves pages 3 seconds after changes
+#### Board Model (`server/models/Board.js`)
+| Field | Type | Description |
+|-------|------|-------------|
+| `pages` | [ObjectId] | References to Page documents |
+| `currentPageId` | ObjectId | Last active page for this board |
+| `canvasData` | String | Legacy field, `select: false` (hidden by default) |
 
-#### 4. Board Component (`client/src/features/board/components/Board.tsx`)
-- Added page navigation UI at bottom center (authenticated users only)
-- Shows numbered page buttons (1, 2, 3, etc.)
-- "+" button to add new pages
-- Added "Pages" submenu in hamburger menu:
-  - Lists all pages with names
-  - Click to switch pages
-  - "Add Page" option
-- Passes `currentPageId` to FabricCanvas component
+### Controllers
 
-#### 5. FabricCanvas Component (`client/src/features/board/components/FabricCanvas.tsx`)
-- Accepts `currentPageId` prop
-- Passes it to `useFabricCanvas` hook
-- Exposes `saveCurrentPageState` and `loadPageState` via ref
+#### Board Controller (`server/controllers/boardController.js`)
+- **`createBoard`** — Creates board + initial "Page 1" document, links them
+- **`getBoardById`** — Auto-migrates legacy boards via `migrateLegacyBoard()`, populates pages
+- **`updateBoard`** — Updates `currentPageId` (validates page exists)
+- **`deleteBoard`** — Cascades: deletes all Page documents via `Page.deleteMany()`
+
+#### Page Controller (`server/controllers/pageController.js`)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/:boardId/pages` | GET | List pages (excludes canvasData for performance) |
+| `/:boardId/pages/:pageId` | GET | Get single page with full canvasData |
+| `/:boardId/pages` | POST | Create new page |
+| `/:boardId/pages/reorder` | PATCH | Reorder pages (literal path, before `:pageId`) |
+| `/:boardId/pages/:pageId` | PATCH | Update page metadata |
+| `/:boardId/pages/:pageId/canvas` | PATCH | Optimized canvas-only save (atomic `findOneAndUpdate`) |
+| `/:boardId/pages/:pageId` | DELETE | Delete page (prevents deleting last page) |
+| `/:boardId/pages/:pageId/duplicate` | POST | Clone page with "(Copy)" suffix |
+
+### Route Order (`server/routes/page.js`)
+**Critical:** The `/reorder` literal path is defined BEFORE `/:pageId` parameterized routes to prevent Express from matching `reorder` as a pageId.
+
+## Frontend
+
+### Types (`client/src/features/board/types/types.ts`)
+```ts
+interface Page {
+  _id: string;    // MongoDB ObjectId string
+  id: string;     // Alias (Mongoose virtual)
+  name: string;
+  canvasData: string;
+  thumbnail?: string;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+```
+
+### useBoard Hook (`client/src/features/board/hooks/useBoard.ts`)
+
+#### ID Normalization
+All backend responses are normalized via `normalizePage()` which maps `_id → id` to ensure both fields are always available.
+
+#### Page Management Functions
+| Function | API Call | Description |
+|----------|----------|-------------|
+| `handleAddPage()` | `POST /board/:boardId/pages` | Creates page on server, then switches to it |
+| `handleSwitchPage(pageId)` | `PATCH .../canvas` + `PATCH /board/:id` | Saves current page, loads target, updates server's currentPageId |
+| `handleDeletePage(pageId)` | `DELETE /board/:boardId/pages/:pageId` | Deletes from server, switches if deleting active page |
+| `handleRenamePage(pageId, name)` | `PATCH /board/:boardId/pages/:pageId` | Updates name on server |
+| `handleDuplicatePage(pageId)` | `POST .../pages/:pageId/duplicate` | Server clones the page |
+| `handleReorderPages(newPageIds)` | `PATCH .../pages/reorder` | Optimistic local reorder + server sync |
+
+#### Save Strategy
+- **Per-canvas-change:** Debounced at 2s → `PATCH /board/:boardId/pages/:pageId/canvas`
+- **With thumbnail:** Debounced at 5s → same endpoint with `thumbnail` field
+- **On page switch:** Immediate save of current page before loading new one
+- **Guest users:** Save to Redux/localStorage only (no multi-page)
+
+#### Board Load Logic
+1. `GET /board/:id` (returns board with populated pages)
+2. Normalize all pages via `normalizePage()`
+3. Restore `currentPageId` from server (or fallback to first page)
+4. Load active page's `canvasData` into Fabric.js canvas
+
+### useFabricCanvas Hook (`client/src/features/board/hooks/useFabricCanvas.ts`)
+- `pageHistoriesRef`: `Map<pageId, {history, index}>` — per-page undo/redo stacks
+- `saveCurrentPageState()`: Snapshots current canvas into history before switch
+- `loadPageState(canvasData)`: Loads canvas from JSON without resetting history map
+- History limited to 50 states per page
+
+### Board Component (`client/src/features/board/components/Board.tsx`)
+
+#### Page Navigation Bar (bottom center)
+- Numbered page buttons
+- Per-page context menu (hover to reveal ⋮ button):
+  - **Rename** — opens modal dialog
+  - **Duplicate** — clones page
+  - **Move Left/Right** — reorders
+  - **Delete** — with guard (can't delete last page)
+- "+" button to add new page
+- Loading overlay during page switches
+
+#### Hamburger Menu
+- Pages submenu listing all pages by name
+- Active page indicator (●)
+- Add Page option
 
 ## User Experience
 
 ### For Authenticated Users
-1. Open any board - see page navigation at bottom center
-2. Click numbered buttons to switch between pages
-3. Click "+" to add a new page
-4. Each page maintains its own:
-   - Canvas drawings
-   - Undo/redo history (up to 50 states per page)
-   - Auto-save state
-5. Access page list via hamburger menu → Pages submenu
+1. Open board → see page navigation at bottom center
+2. Click numbered buttons to switch pages
+3. Hover over a page button → context menu appears (⋮)
+4. Right-click context menu: Rename, Duplicate, Move, Delete
+5. Click "+" to add a new blank page
+6. Each page independently saves canvas + undo/redo history
+7. On reload, the last active page is restored
 
 ### For Guest Users
-- Multi-page feature is disabled
+- Multi-page feature is completely hidden
 - Single canvas experience (as before)
-- No page navigation UI shown
-
-## Technical Highlights
-
-### History Isolation
-- Each page has its own history stack stored in a Map
-- Switching pages saves current history and loads target page's history
-- No cross-contamination between page histories
-
-### Auto-Save Strategy
-- Current page auto-saves every 2-5 seconds (debounced)
-- Page switching triggers immediate save of current page
-- All pages saved together every 3 seconds after changes
-
-### Backward Compatibility
-- Legacy boards without `pages` field are automatically migrated
-- First load creates a "Page 1" from existing `canvasData`
-- No data loss during migration
-
-### Performance Considerations
-- History limited to 50 states per page
-- Debounced save operations prevent excessive API calls
-- Thumbnail generation only when not actively drawing
-
-## Future Enhancements (Available but not exposed in UI)
-- `handleDeletePage()`: Delete specific pages
-- `handleRenamePage()`: Rename pages with custom names
-- Page reordering
-- Page duplication
-- Page thumbnails in navigation
-
-## Testing Recommendations
-1. Create a new board → verify default page created
-2. Add multiple pages → verify each has independent canvas
-3. Draw on page 1, switch to page 2, draw different content
-4. Switch back to page 1 → verify original content preserved
-5. Test undo/redo on each page → verify history isolation
-6. Refresh browser → verify all pages persist correctly
-7. Test with guest user → verify multi-page UI hidden
-8. Test legacy board migration → verify smooth upgrade
+- Canvas saved to localStorage
 
 ## Files Modified
-- `server/models/Board.js`
-- `server/controllers/boardController.js`
-- `client/src/features/board/types/types.ts`
-- `client/src/features/board/hooks/useFabricCanvas.ts`
-- `client/src/features/board/hooks/useBoard.ts`
-- `client/src/features/board/components/Board.tsx`
-- `client/src/features/board/components/FabricCanvas.tsx`
-
-## Summary
-Multi-page support is now fully functional for authenticated users. Each page operates independently with its own canvas state and undo/redo history. The implementation is backward compatible and includes auto-save functionality.
+- `server/models/Page.js` — added `toJSON` virtuals
+- `server/models/Board.js` — unchanged
+- `server/controllers/boardController.js` — unchanged
+- `server/controllers/pageController.js` — unchanged
+- `server/routes/page.js` — fixed route ordering
+- `client/src/features/board/types/types.ts` — added `_id`, `order` fields
+- `client/src/features/board/hooks/useBoard.ts` — full rewrite for API sync
+- `client/src/features/board/hooks/useFabricCanvas.ts` — unchanged
+- `client/src/features/board/components/Board.tsx` — full UI for page management
+- `client/src/features/board/components/FabricCanvas.tsx` — unchanged

@@ -11,11 +11,14 @@ export type Tool =
 export type SaveStatus = "idle" | "saving" | "saved";
 
 export interface Page {
-  id: string;
+  _id: string;         // MongoDB ObjectId string from backend
+  id: string;          // Alias (Mongoose virtual or mapped from _id)
   name: string;
   canvasData: string;
   thumbnail?: string;
-  createdAt?: Date;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Board {
@@ -25,6 +28,7 @@ export interface Board {
   canvasData?: string;
   thumbnail?: string;
   pages?: Page[];
+  currentPageId?: string;
   isPublic: boolean;
   owner: { username: string };
 }
@@ -62,7 +66,7 @@ export interface FabricCanvasProps {
 export interface ToolbarProps {
   tool: Tool;
   setTool: (tool: Tool) => void;
-  handleToolChange: (tool: Tool)=> void;
+  handleToolChange: (tool: Tool) => void;
   toolsWithOptions: Tool[];
   showToolOptions: boolean;
 }
