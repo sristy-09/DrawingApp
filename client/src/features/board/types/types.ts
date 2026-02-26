@@ -11,8 +11,8 @@ export type Tool =
 export type SaveStatus = "idle" | "saving" | "saved";
 
 export interface Page {
-  _id: string;         // MongoDB ObjectId string from backend
-  id: string;          // Alias (Mongoose virtual or mapped from _id)
+  _id: string; // MongoDB ObjectId string from backend
+  id: string; // Alias (Mongoose virtual or mapped from _id)
   name: string;
   canvasData: string;
   thumbnail?: string;
@@ -41,7 +41,7 @@ export interface FabricCanvasRef {
     brushWidth: number;
     tool: Tool;
   }) => void;
-  loadFromJson: (json: string) => void;
+  loadFromJson: (json: string, targetPageId?: string) => void;
   saveToJson: () => string;
   zoomIn: () => void;
   zoomOut: () => void;
@@ -51,7 +51,8 @@ export interface FabricCanvasRef {
   undo: () => void;
   redo: () => void;
   saveCurrentPageState: () => void;
-  loadPageState: (canvasData: string) => void;
+  loadPageState: (canvasData: string, targetPageId?: string) => void;
+  clearPageHistory: (pageId: string) => void;
 }
 
 export interface FabricCanvasProps {

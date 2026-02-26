@@ -85,7 +85,6 @@ const Board: React.FC = () => {
 
   // Page context menu state
 
-
   const handleLogout = () => {
     logout();
     navigate("/login");
@@ -116,12 +115,12 @@ const Board: React.FC = () => {
 
   // Move page up or down
   const movePage = (pageId: string, direction: "up" | "down") => {
-    const idx = pages.findIndex(p => p._id === pageId);
+    const idx = pages.findIndex((p) => p._id === pageId);
     if (idx < 0) return;
     if (direction === "up" && idx === 0) return;
     if (direction === "down" && idx === pages.length - 1) return;
 
-    const newIds = pages.map(p => p._id);
+    const newIds = pages.map((p) => p._id);
     const swapIdx = direction === "up" ? idx - 1 : idx + 1;
     [newIds[idx], newIds[swapIdx]] = [newIds[swapIdx], newIds[idx]];
     handleReorderPages(newIds);
@@ -151,7 +150,7 @@ const Board: React.FC = () => {
 
   // Predefined color palette - theme-aware
   const getColorPalette = () => {
-    const isDark = document.documentElement.classList.contains('dark');
+    const isDark = document.documentElement.classList.contains("dark");
     return [
       isDark ? "#FFFFFF" : "#000000", // White in dark mode, Black in light mode
       "#FF0000", // Red
@@ -212,7 +211,9 @@ const Board: React.FC = () => {
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <span className="text-sm font-medium text-card-foreground">Switching page...</span>
+            <span className="text-sm font-medium text-card-foreground">
+              Switching page...
+            </span>
           </div>
         </div>
       )}
@@ -242,20 +243,22 @@ const Board: React.FC = () => {
                 <button
                   key={paletteColor}
                   onClick={() => setColor(paletteColor)}
-                  className={`w-10 h-10 rounded-lg border-2 transition-all relative ${color === paletteColor
-                    ? "border-primary scale-110 shadow-md"
-                    : "border-border hover:scale-105"
-                    }`}
+                  className={`w-10 h-10 rounded-lg border-2 transition-all relative ${
+                    color === paletteColor
+                      ? "border-primary scale-110 shadow-md"
+                      : "border-border hover:scale-105"
+                  }`}
                   style={{ backgroundColor: paletteColor }}
                   title={paletteColor}
                 >
                   {color === paletteColor && (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <FaCheck
-                        className={`text-sm ${paletteColor === "#000000"
-                          ? "text-white"
-                          : "text-white"
-                          }`}
+                        className={`text-sm ${
+                          paletteColor === "#000000"
+                            ? "text-white"
+                            : "text-white"
+                        }`}
                         style={{
                           filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))",
                         }}
@@ -295,10 +298,11 @@ const Board: React.FC = () => {
                 <button
                   key={width}
                   onClick={() => setBrushWidth(width)}
-                  className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${brushWidth === width
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:border-primary/50 bg-card"
-                    }`}
+                  className={`h-10 rounded-lg border-2 transition-all flex items-center justify-center ${
+                    brushWidth === width
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-primary/50 bg-card"
+                  }`}
                   title={`${width}px`}
                 >
                   <div
@@ -336,21 +340,22 @@ const Board: React.FC = () => {
             )}
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem onClick={handleDashboard} className="cursor-pointer">
+            <DropdownMenuItem
+              onClick={handleDashboard}
+              className="cursor-pointer"
+            >
               <FaHome className="mr-2" />
               <span>Dashboard</span>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem onClick={handleClear}
-              className="cursor-pointer">
+            <DropdownMenuItem onClick={handleClear} className="cursor-pointer">
               <FaTrash className="w-4 h-4" />
               <span>Clear Canvas</span>
             </DropdownMenuItem>
 
-            <DropdownMenuItem onClick={handleSave}
-              className="cursor-pointer">
+            <DropdownMenuItem onClick={handleSave} className="cursor-pointer">
               <FaSave className="w-4 h-4" />
               <span>Save</span>
             </DropdownMenuItem>
@@ -369,19 +374,25 @@ const Board: React.FC = () => {
                       <DropdownMenuItem
                         key={page._id}
                         onClick={() => handleSwitchPage(page._id)}
-                        className={`cursor-pointer ${currentPageId === page._id ? "bg-accent" : ""
-                          }`}
+                        className={`cursor-pointer ${
+                          currentPageId === page._id ? "bg-accent" : ""
+                        }`}
                       >
                         <span className="flex-1">
                           {index + 1}. {page.name}
                         </span>
                         {currentPageId === page._id && (
-                          <span className="text-xs text-muted-foreground ml-2">●</span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            ●
+                          </span>
                         )}
                       </DropdownMenuItem>
                     ))}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleAddPage} className="cursor-pointer">
+                    <DropdownMenuItem
+                      onClick={handleAddPage}
+                      className="cursor-pointer"
+                    >
                       <FaPlus className="w-4 h-4" />
                       <span>Add Page</span>
                     </DropdownMenuItem>
@@ -392,14 +403,19 @@ const Board: React.FC = () => {
 
             <DropdownMenuSeparator />
 
-            {isAuthenticated ? (<DropdownMenuItem
-              onClick={handleLogout}
-              className="cursor-pointer text-blue-400"
-            >
-              <FaSignOutAlt className="mr-2 text-blue-400" />
-              <span>Sign Out</span>
-            </DropdownMenuItem>) : (
-              <DropdownMenuItem onClick={() => navigate("/login")} className="cursor-pointer text-blue-400">
+            {isAuthenticated ? (
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="cursor-pointer text-blue-400"
+              >
+                <FaSignOutAlt className="mr-2 text-blue-400" />
+                <span>Sign Out</span>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                onClick={() => navigate("/login")}
+                className="cursor-pointer text-blue-400"
+              >
                 <FaSignInAlt className="mr-2 text-blue-400" />
                 <span>Sign In</span>
               </DropdownMenuItem>
@@ -467,10 +483,11 @@ const Board: React.FC = () => {
                 <button
                   onClick={() => handleSwitchPage(page._id)}
                   disabled={isLoadingPage}
-                  className={`px-3 py-1.5 rounded transition-all text-sm font-medium min-w-[36px] ${currentPageId === page._id
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "hover:bg-accent text-card-foreground"
-                    } ${isLoadingPage ? "opacity-50 cursor-wait" : ""}`}
+                  className={`px-3 py-1.5 rounded transition-all text-sm font-medium min-w-9 ${
+                    currentPageId === page._id
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "hover:bg-accent text-card-foreground"
+                  } ${isLoadingPage ? "opacity-50 cursor-wait" : ""}`}
                   title={page.name}
                 >
                   {index + 1}
@@ -487,7 +504,7 @@ const Board: React.FC = () => {
                         <FaEllipsisV className="text-[8px] text-muted-foreground" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="min-w-[160px]" align="center">
+                    <DropdownMenuContent className="min-w-40" align="center">
                       <DropdownMenuLabel className="text-xs truncate max-w-[140px]">
                         {page.name}
                       </DropdownMenuLabel>
@@ -560,14 +577,16 @@ const Board: React.FC = () => {
       {/* Page Rename Modal */}
       {renamingPageId && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/40"
           onClick={() => setRenamingPageId(null)}
         >
           <div
             className="bg-card border-2 border-border rounded-xl shadow-2xl p-6 min-w-[320px] max-w-[400px]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-semibold text-card-foreground mb-4">Rename Page</h3>
+            <h3 className="text-base font-semibold text-card-foreground mb-4">
+              Rename Page
+            </h3>
             <input
               ref={renameInputRef}
               type="text"

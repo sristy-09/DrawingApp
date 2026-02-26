@@ -3,8 +3,12 @@ import type { FabricCanvasRef, Tool, Page } from "../types/types";
 import { useParams } from "react-router";
 import axios from "axios";
 import { debounce } from "lodash";
-import { useAppDispatch, useAppSelector } from "../../../store/hooks"
-import { setCanvasData, setIsGuest, loadGuestBoardData } from "../../../store/boardSlice";
+import { useAppDispatch, useAppSelector } from "../../../store/hooks";
+import {
+  setCanvasData,
+  setIsGuest,
+  loadGuestBoardData,
+} from "../../../store/boardSlice";
 import { getData } from "../../core/context/userContext";
 
 // Normalize a page object from the backend (_id → id)
@@ -24,7 +28,7 @@ export function useBoard() {
 
   // Get theme-aware default color
   const getDefaultColor = () => {
-    const isDark = document.documentElement.classList.contains('dark');
+    const isDark = document.documentElement.classList.contains("dark");
     return isDark ? "#FFFFFF" : "#000000";
   };
 
@@ -198,14 +202,14 @@ export function useBoard() {
       // Use the page-specific canvas endpoint
       await axios.patch(
         `${API_URL}/board/${id}/pages/${currentPageId}/canvas`,
-        payload
+        payload,
       );
 
       // Also update the page's canvasData in local state
-      setPages(prev =>
-        prev.map(p =>
-          p._id === currentPageId ? { ...p, canvasData: json } : p
-        )
+      setPages((prev) =>
+        prev.map((p) =>
+          p._id === currentPageId ? { ...p, canvasData: json } : p,
+        ),
       );
 
       lastSavedDataRef.current = json;
@@ -289,15 +293,14 @@ export function useBoard() {
 
           // Use server's currentPageId, or first page as fallback
           const activePageId =
-            boardData.currentPageId ||
-            normalizedPages[0]._id;
+            boardData.currentPageId || normalizedPages[0]._id;
 
           setCurrentPageId(activePageId);
 
           // Find the active page and load its canvas data
-          const activePage = normalizedPages.find(
-            (p: Page) => p._id === activePageId
-          ) || normalizedPages[0];
+          const activePage =
+            normalizedPages.find((p: Page) => p._id === activePageId) ||
+            normalizedPages[0];
 
           if (activePage?.canvasData && canvasRef.current?.loadFromJson) {
             canvasRef.current.loadFromJson(activePage.canvasData);
@@ -457,11 +460,17 @@ export function useBoard() {
   useEffect(() => {
     // Initialize theme tracking
     if (previousThemeRef.current === null) {
-      previousThemeRef.current = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+      previousThemeRef.current = document.documentElement.classList.contains(
+        "dark",
+      )
+        ? "dark"
+        : "light";
     }
 
     const observer = new MutationObserver(() => {
-      const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+      const currentTheme = document.documentElement.classList.contains("dark")
+        ? "dark"
+        : "light";
 
       // Only invert if theme actually changed
       if (previousThemeRef.current !== currentTheme) {
@@ -471,9 +480,17 @@ export function useBoard() {
         const normalizedColor = color.toLowerCase().trim();
 
         // Invert current color if it's black or white
-        if (normalizedColor === "#000000" || normalizedColor === "#000" || normalizedColor === "black") {
+        if (
+          normalizedColor === "#000000" ||
+          normalizedColor === "#000" ||
+          normalizedColor === "black"
+        ) {
           setColor("#FFFFFF");
-        } else if (normalizedColor === "#ffffff" || normalizedColor === "#fff" || normalizedColor === "white") {
+        } else if (
+          normalizedColor === "#ffffff" ||
+          normalizedColor === "#fff" ||
+          normalizedColor === "white"
+        ) {
           setColor("#000000");
         }
       }
@@ -481,7 +498,7 @@ export function useBoard() {
 
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class']
+      attributeFilter: ["class"],
     });
 
     return () => observer.disconnect();
@@ -507,10 +524,11 @@ export function useBoard() {
       canvasRef.current.saveCurrentPageState?.();
       const currentJson = canvasRef.current.saveToJson();
       // Fire-and-forget save of current page
-      axios.patch(
-        `${API_URL}/board/${id}/pages/${currentPageId}/canvas`,
-        { canvasData: currentJson }
-      ).catch(err => console.error("Error saving before page add:", err));
+      axios
+        .patch(`${API_URL}/board/${id}/pages/${currentPageId}/canvas`, {
+          canvasData: currentJson,
+        })
+        .catch((err) => console.error("Error saving before page add:", err));
     }
 
     try {
@@ -519,7 +537,7 @@ export function useBoard() {
       });
 
       const newPage = normalizePage(res.data);
-      setPages(prev => [...prev, newPage]);
+      setPages((prev) => [...prev, newPage]);
       setCurrentPageId(newPage._id);
 
       // Update board currentPageId on server
@@ -527,9 +545,10 @@ export function useBoard() {
         currentPageId: newPage._id,
       });
 
-      // Clear canvas for new page
+      // Clear canvas for new page — pass the new page's ID explicitly since
+      // setCurrentPageId is async and the hook still holds the old page's ID
       if (canvasRef.current) {
-        canvasRef.current.loadFromJson("{}");
+        canvasRef.current.loadFromJson("{}", newPage._id);
         lastSavedDataRef.current = "{}";
       }
     } catch (error) {
@@ -539,7 +558,8 @@ export function useBoard() {
 
   // SWITCH PAGE — saves current, loads target, updates server currentPageId
   const handleSwitchPage = async (pageId: string) => {
-    if (!isAuthenticated || pageId === currentPageId || isLoadingPage || !id) return;
+    if (!isAuthenticated || pageId === currentPageId || isLoadingPage || !id)
+      return;
 
     setIsLoadingPage(true);
 
@@ -550,21 +570,21 @@ export function useBoard() {
         const currentJson = canvasRef.current.saveToJson();
 
         // Update local state
-        setPages(prev =>
-          prev.map(p =>
-            p._id === currentPageId ? { ...p, canvasData: currentJson } : p
-          )
+        setPages((prev) =>
+          prev.map((p) =>
+            p._id === currentPageId ? { ...p, canvasData: currentJson } : p,
+          ),
         );
 
         // Save to backend
         await axios.patch(
           `${API_URL}/board/${id}/pages/${currentPageId}/canvas`,
-          { canvasData: currentJson }
+          { canvasData: currentJson },
         );
       }
 
       // Fetch the target page's full data (canvasData may have been excluded from list)
-      const targetPage = pages.find(p => p._id === pageId);
+      const targetPage = pages.find((p) => p._id === pageId);
       let canvasData = targetPage?.canvasData || "{}";
 
       // If canvasData is missing, fetch from backend
@@ -573,10 +593,8 @@ export function useBoard() {
           const res = await axios.get(`${API_URL}/board/${id}/pages/${pageId}`);
           canvasData = res.data.canvasData || "{}";
           // Update local state with fetched data
-          setPages(prev =>
-            prev.map(p =>
-              p._id === pageId ? { ...p, canvasData } : p
-            )
+          setPages((prev) =>
+            prev.map((p) => (p._id === pageId ? { ...p, canvasData } : p)),
           );
         } catch {
           // Use whatever we have
@@ -586,15 +604,18 @@ export function useBoard() {
       // Switch
       setCurrentPageId(pageId);
       if (canvasRef.current) {
-        canvasRef.current.loadPageState?.(canvasData);
+        // Pass pageId explicitly — React's setCurrentPageId is async so the canvas
+        // hook still holds the old currentPageId prop at this point.
+        canvasRef.current.loadPageState?.(canvasData, pageId);
         lastSavedDataRef.current = canvasData;
       }
 
       // Update server's currentPageId
-      axios.patch(`${API_URL}/board/${id}`, {
-        currentPageId: pageId,
-      }).catch(err => console.error("Error updating currentPageId:", err));
-
+      axios
+        .patch(`${API_URL}/board/${id}`, {
+          currentPageId: pageId,
+        })
+        .catch((err) => console.error("Error updating currentPageId:", err));
     } catch (error) {
       console.error("❌ Error switching page:", error);
     } finally {
@@ -609,7 +630,7 @@ export function useBoard() {
     try {
       const res = await axios.delete(`${API_URL}/board/${id}/pages/${pageId}`);
 
-      const newPages = pages.filter(p => p._id !== pageId);
+      const newPages = pages.filter((p) => p._id !== pageId);
       setPages(newPages);
 
       // If deleting current page, switch to the page the server suggests or the first remaining
@@ -617,12 +638,19 @@ export function useBoard() {
         const newCurrentId = res.data.newCurrentPageId || newPages[0]._id;
         setCurrentPageId(newCurrentId);
 
-        const newCurrentPage = newPages.find(p => p._id === newCurrentId) || newPages[0];
+        const newCurrentPage =
+          newPages.find((p) => p._id === newCurrentId) || newPages[0];
         if (canvasRef.current) {
-          canvasRef.current.loadPageState?.(newCurrentPage.canvasData || "{}");
+          canvasRef.current.loadPageState?.(
+            newCurrentPage.canvasData || "{}",
+            newCurrentId,
+          );
           lastSavedDataRef.current = newCurrentPage.canvasData || "{}";
         }
       }
+
+      // Clean up history for the deleted page so memory doesn't grow unbounded
+      canvasRef.current?.clearPageHistory?.(pageId);
     } catch (error) {
       console.error("❌ Error deleting page:", error);
     }
@@ -637,10 +665,8 @@ export function useBoard() {
         name: newName,
       });
 
-      setPages(prev =>
-        prev.map(p =>
-          p._id === pageId ? { ...p, name: newName } : p
-        )
+      setPages((prev) =>
+        prev.map((p) => (p._id === pageId ? { ...p, name: newName } : p)),
       );
     } catch (error) {
       console.error("❌ Error renaming page:", error);
@@ -654,21 +680,20 @@ export function useBoard() {
     // If duplicating current page, save its latest canvas first
     if (pageId === currentPageId && canvasRef.current) {
       const currentJson = canvasRef.current.saveToJson();
-      await axios.patch(
-        `${API_URL}/board/${id}/pages/${pageId}/canvas`,
-        { canvasData: currentJson }
-      );
+      await axios.patch(`${API_URL}/board/${id}/pages/${pageId}/canvas`, {
+        canvasData: currentJson,
+      });
     }
 
     try {
       const res = await axios.post(
-        `${API_URL}/board/${id}/pages/${pageId}/duplicate`
+        `${API_URL}/board/${id}/pages/${pageId}/duplicate`,
       );
       const duplicated = normalizePage(res.data);
 
       // Insert after the original page
-      setPages(prev => {
-        const idx = prev.findIndex(p => p._id === pageId);
+      setPages((prev) => {
+        const idx = prev.findIndex((p) => p._id === pageId);
         const newPages = [...prev];
         newPages.splice(idx + 1, 0, duplicated);
         return newPages;
@@ -684,7 +709,7 @@ export function useBoard() {
 
     // Optimistic local update
     const reorderedPages = newPageIds
-      .map(pid => pages.find(p => p._id === pid))
+      .map((pid) => pages.find((p) => p._id === pid))
       .filter(Boolean) as Page[];
     setPages(reorderedPages);
 
