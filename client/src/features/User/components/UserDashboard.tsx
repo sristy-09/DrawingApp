@@ -12,6 +12,7 @@ import {
 } from "../../core/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "../../core/components/ui/avatar";
 import { CreateBoardModal } from "./CreateBoardModal";
+import { SaveGuestBoardDialog } from "../../auth/components/SaveGuestBoardDialog";
 import { FaSignOutAlt } from "react-icons/fa";
 
 function UserDashboard() {
@@ -22,10 +23,14 @@ function UserDashboard() {
     setNewBoard,
     showNewBoardForm,
     setShowNewBoardForm,
+    showSaveDialog,
     fetchBoards,
     createBoard,
     handleLogout,
     handleBoardDeleted,
+    handleSaveGuestBoard,
+    handleDiscardGuestBoard,
+    handleCancelSaveDialog,
   } = useUserDashboard();
 
   if (!user) {
@@ -183,6 +188,14 @@ function UserDashboard() {
         onSubmit={createBoard}
         boardData={newBoard}
         setBoardData={setNewBoard}
+      />
+
+      {/* Save Guest Board Dialog */}
+      <SaveGuestBoardDialog
+        open={showSaveDialog}
+        onSave={handleSaveGuestBoard}
+        onDiscard={handleDiscardGuestBoard}
+        onCancel={handleCancelSaveDialog}
       />
     </div>
   );
