@@ -1155,7 +1155,6 @@ export function useFabricCanvas({
       }, 100);
     };
 
-    fab.on("object:added", handleHistoryEvent); // ✅ FIX: was missing registration (only in cleanup before)
     fab.on("object:modified", handleHistoryEvent);
     fab.on("object:removed", handleHistoryEvent);
 

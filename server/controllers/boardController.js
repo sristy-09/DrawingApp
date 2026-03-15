@@ -42,6 +42,8 @@ export const createBoard = async (req, res) => {
       title = "Untitled Board",
       description = "",
       isPublic = false,
+      canvasData = "{}",
+      thumbnail = "",
     } = req.body;
 
     // Create board
@@ -58,8 +60,8 @@ export const createBoard = async (req, res) => {
     const firstPage = new Page({
       board: board._id,
       name: "Page 1",
-      canvasData: "{}",
-      thumbnail: "",
+      canvasData,
+      thumbnail,
       order: 0,
     });
 
@@ -118,7 +120,7 @@ export const getBoardById = async (req, res) => {
     // Check access
     const isOwner = board.owner._id.equals(req.user.id);
     const isCollaborator = board.collaborators.some((c) =>
-      c.user.equals(req.user.id)
+      c.user.equals(req.user.id),
     );
 
     if (!isOwner && !isCollaborator) {
@@ -161,7 +163,7 @@ export const updateBoard = async (req, res) => {
     // Auth check
     const isOwner = board.owner.equals(req.user.id);
     const collaborator = board.collaborators.find((c) =>
-      c.user.equals(req.user.id)
+      c.user.equals(req.user.id),
     );
     const isEditor = collaborator?.role === "editor";
 
@@ -172,9 +174,7 @@ export const updateBoard = async (req, res) => {
     }
 
     if (!isOwner && !isEditor) {
-      return res
-        .status(403)
-        .json({ message: "Editor permission required" });
+      return res.status(403).json({ message: "Editor permission required" });
     }
 
     // Update fields

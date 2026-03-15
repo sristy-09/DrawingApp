@@ -74,7 +74,7 @@ function AuthSuccess() {
           title: boardData.title,
           description: boardData.description,
           isPublic: boardData.isPublic,
-          canvasData: guestCanvasData,
+          canvasData: guestCanvasData || "{}",
         },
         {
           headers: {
