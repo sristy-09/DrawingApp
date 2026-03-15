@@ -25,6 +25,7 @@ export function useUserDashboard() {
 
   const [showNewBoardForm, setShowNewBoardForm] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [hasCheckedGuestData, setHasCheckedGuestData] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL;
 
   const checkGuestData = () => {
@@ -32,12 +33,13 @@ export function useUserDashboard() {
     return !!guestData && guestData !== '{"objects":[],"background":"#FFFFFF"}';
   };
 
-  // Check for guest data on mount
+  // Check for guest data on mount - only once
   useEffect(() => {
-    if (user && checkGuestData()) {
+    if (user && !hasCheckedGuestData && checkGuestData()) {
       setShowSaveDialog(true);
+      setHasCheckedGuestData(true);
     }
-  }, [user]);
+  }, [user, hasCheckedGuestData]);
 
   const fetchBoards = async () => {
     try {
