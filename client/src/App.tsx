@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
-import HomePage from "./pages/HomePage";
 import SignUpPage from "./features/auth/components/SignUpPage";
 import LoginPage from "./features/auth/components/LoginPage";
 import AuthSuccess from "./features/auth/components/AuthSuccess";
@@ -16,7 +15,7 @@ function App() {
             path="/"
             element={
               <AuthRoute mode="guest">
-                <HomePage />
+                <Board />
               </AuthRoute>
             }
           />
@@ -38,14 +37,7 @@ function App() {
           />
           <Route path="/auth-success" element={<AuthSuccess />} />
 
-          <Route
-            path="/board"
-            element={
-              <AuthRoute mode="guest">
-                <Board />
-              </AuthRoute>
-            }
-          />
+          
           <Route
             path="/dashboard"
             element={

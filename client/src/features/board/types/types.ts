@@ -11,12 +11,25 @@ export type Tool =
   | "text";
 export type SaveStatus = "idle" | "saving" | "saved";
 
+export interface Page {
+  _id: string; // MongoDB ObjectId string from backend
+  id: string; // Alias (Mongoose virtual or mapped from _id)
+  name: string;
+  canvasData: string;
+  thumbnail?: string;
+  order: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Board {
   _id: string;
   title: string;
   description?: string;
   canvasData?: string;
   thumbnail?: string;
+  pages?: Page[];
+  currentPageId?: string;
   isPublic: boolean;
   owner: { username: string };
 }
@@ -29,8 +42,8 @@ export interface FabricCanvasRef {
     brushWidth: number;
     tool: Tool;
   }) => void;
-  loadFromJson: (json: string) => void; //  Load canvas data
-  saveToJson: () => string; // Serialize to JSON
+  loadFromJson: (json: string, targetPageId?: string) => void;
+  saveToJson: () => string;
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
@@ -38,6 +51,9 @@ export interface FabricCanvasRef {
   getThumbnail: (width?: number, height?: number) => string;
   undo: () => void;
   redo: () => void;
+  saveCurrentPageState: () => void;
+  loadPageState: (canvasData: string, targetPageId?: string) => void;
+  clearPageHistory: (pageId: string) => void;
 }
 
 export interface FabricCanvasProps {
@@ -46,12 +62,13 @@ export interface FabricCanvasProps {
   tool: Tool;
   loadJson?: string;
   onToolChange?: (tool: Tool) => void;
+  currentPageId?: string;
 }
 
 export interface ToolbarProps {
   tool: Tool;
   setTool: (tool: Tool) => void;
-  handleToolChange: (tool: Tool)=> void;
+  handleToolChange: (tool: Tool) => void;
   toolsWithOptions: Tool[];
   showToolOptions: boolean;
 }
