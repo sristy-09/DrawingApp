@@ -42,23 +42,21 @@ const Toolbar: React.FC<ToolbarProps> = ({
       <div
         ref={toolbarRef}
         style={getToolbarStyle()}
-        className={`z-40 bg-white border-2 border-gray-300 rounded-xl shadow-lg p-3 ${
-          isDragging ? "opacity-80 " : ""
-        }`}
+        className={`z-40 bg-card border-2 border-border rounded-xl shadow-lg p-3 ${isDragging ? "opacity-80 " : ""
+          }`}
       >
         <div
-          className={`flex ${
-            isVertical ? "flex-col" : "flex-row"
-          } items-center gap-2`}
+          className={`flex ${isVertical ? "flex-col" : "flex-row"
+            } items-center gap-2`}
         >
           {/* Drag Handle - ONLY drag from here */}
           <div
             onMouseDown={handleDragStart}
             onTouchStart={handleDragStart}
-            className="p-2 hover:bg-gray-100 rounded transition-colors cursor-grab active:cursor-grabbing"
+            className="p-2 hover:bg-accent rounded transition-colors cursor-grab active:cursor-grabbing"
             title="Drag to reposition"
           >
-            <FaGripVertical className="text-gray-400" />
+            <FaGripVertical className="text-muted-foreground" />
           </div>
 
           {/* Tool Buttons */}
@@ -69,18 +67,17 @@ const Toolbar: React.FC<ToolbarProps> = ({
               <button
                 key={typedKey}
                 onClick={() => handleToolChange(typedKey)}
-                className={`px-1 py-1 rounded border transition-colors relative ${
-                  tool === typedKey
-                    ? "bg-blue-500 text-white border-blue-500"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-200"
-                }`}
+                className={`px-1 py-1 rounded border transition-colors relative ${tool === typedKey
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-card-foreground border-border hover:bg-accent"
+                  }`}
                 title={typedKey.charAt(0).toUpperCase() + typedKey.slice(1)}
               >
                 {toolIcons[typedKey]}
 
                 {/* Active Indicator dot for tools with options */}
                 {hasOptions && tool === typedKey && showToolOptions && (
-                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-white rounded-full" />
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-primary-foreground rounded-full" />
                 )}
               </button>
             );

@@ -7,17 +7,20 @@ export function useFabricCanvas({
   brushWidth,
   tool,
   onToolChange,
+  currentPageId,
 }: {
   color: string;
   brushWidth: number;
   tool: Tool;
-  onToolChange?: (tool: Tool) => void; // Optional callback to update tool state
+  onToolChange?: (tool: Tool) => void;
+  currentPageId?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const canvasInstance = useRef<fabric.Canvas | null>(null);
   const isPanningRef = useRef<boolean>(false);
   const lastPosXRef = useRef<number>(0);
   const lastPosYRef = useRef<number>(0);
+  const previousThemeRef = useRef<string | null>(null);
 
   const activeToolHandlersRef = useRef<{
     down?: any;
@@ -32,10 +35,56 @@ export function useFabricCanvas({
   const eraserCircleRef = useRef<fabric.Circle | null>(null);
   const isErasingRef = useRef<boolean>(false);
 
-  // UNDO/REDO STATE
-  const historyRef = useRef<string[]>([]);
-  const historyIndexRef = useRef<number>(-1);
+  // UNDO/REDO STATE - Per-page history
+  const pageHistoriesRef = useRef<
+    Map<string, { history: string[]; index: number }>
+  >(new Map());
   const isUndoRedoRef = useRef<boolean>(false);
+  const isLoadingPageRef = useRef<boolean>(false); // Guard for page switching
+
+  // 🔑 FIX: Keep a ref that always holds the LATEST currentPageId.
+  // Updated synchronously during render (not in a useEffect) so it's always
+  // current even inside callbacks that were created before this render.
+  // This avoids stale-closure bugs where saveHistory/undo/redo write to the
+  // wrong page's history stack after a page switch.
+  const currentPageIdRef = useRef<string>(currentPageId || "default");
+  const nextPageId = currentPageId || "default";
+  if (currentPageIdRef.current !== nextPageId) {
+    console.log(
+      `📄 [useFabricCanvas] currentPageId updated: "${currentPageIdRef.current}" → "${nextPageId}"`,
+    );
+    currentPageIdRef.current = nextPageId;
+  }
+
+  // Get current page's history — always reads from the live ref, never a stale closure
+  const getCurrentPageHistory = useCallback(() => {
+    const pageId = currentPageIdRef.current;
+    if (!pageHistoriesRef.current.has(pageId)) {
+      console.log(
+        `📋 [History] Creating new history entry for page "${pageId}"`,
+      );
+      pageHistoriesRef.current.set(pageId, { history: [], index: -1 });
+    }
+    return pageHistoriesRef.current.get(pageId)!;
+  }, []); // ✅ No dependency on currentPageId — uses the ref instead
+
+  // Get canvas background color based on theme
+  const getCanvasBackgroundColor = useCallback(() => {
+    const isDark = document.documentElement.classList.contains("dark");
+    return isDark ? "#1a1a1a" : "#FFFFFF";
+  }, []);
+
+  // Check if theme has changed
+  const hasThemeChanged = useCallback(() => {
+    const currentTheme = document.documentElement.classList.contains("dark")
+      ? "dark"
+      : "light";
+    const changed =
+      previousThemeRef.current !== null &&
+      previousThemeRef.current !== currentTheme;
+    previousThemeRef.current = currentTheme;
+    return changed;
+  }, []);
 
   const saveHistory = useCallback(() => {
     const canvas = canvasInstance.current;
@@ -44,8 +93,11 @@ export function useFabricCanvas({
       return;
     }
 
-    // Undo/redo in progress, skip saving
-    if (isUndoRedoRef.current) {
+    // Skip saving during undo/redo or page loading
+    if (isUndoRedoRef.current || isLoadingPageRef.current) {
+      console.log(
+        `⏸️  [saveHistory] Skipped — isUndoRedo=${isUndoRedoRef.current}, isLoadingPage=${isLoadingPageRef.current}`,
+      );
       return;
     }
 
@@ -59,51 +111,80 @@ export function useFabricCanvas({
       }
       const state = JSON.stringify(json);
 
+      const pageHistory = getCurrentPageHistory();
+      const pageId = currentPageIdRef.current; // for logging
+
       // Don't save if state hasn't changed
-      const lastState = historyRef.current[historyIndexRef.current];
+      const lastState = pageHistory.history[pageHistory.index];
       if (lastState === state) {
         return;
       }
 
       // Remove any redo states
-      if (historyIndexRef.current < historyRef.current.length - 1) {
-        historyRef.current = historyRef.current.slice(
+      if (pageHistory.index < pageHistory.history.length - 1) {
+        console.log(
+          `✂️  [saveHistory][${pageId}] Trimming ${pageHistory.history.length - 1 - pageHistory.index} redo state(s)`,
+        );
+        pageHistory.history = pageHistory.history.slice(
           0,
-          historyIndexRef.current + 1,
+          pageHistory.index + 1,
         );
       }
 
       // Add new state
-      historyRef.current.push(state);
-      historyIndexRef.current++;
+      pageHistory.history.push(state);
+      pageHistory.index++;
 
       // Limit history to 50 states
-      if (historyRef.current.length > 50) {
-        historyRef.current.shift();
-        historyIndexRef.current--;
+      if (pageHistory.history.length > 50) {
+        pageHistory.history.shift();
+        pageHistory.index--;
       }
+
+      console.log(
+        `💾 [saveHistory][${pageId}] Saved state #${pageHistory.index} (total: ${pageHistory.history.length})`,
+      );
     } catch (error) {
       console.error("❌ Error saving history:", error);
     }
-  }, []);
+  }, [getCurrentPageHistory]);
+
+  // Stable ref for saveHistory — allows mount effect to always call
+  // the latest saveHistory without depending on it (preventing canvas re-creation)
+  const saveHistoryRef = useRef(saveHistory);
+  useEffect(() => {
+    saveHistoryRef.current = saveHistory;
+  }, [saveHistory]);
 
   // ===== UNDO FUNCTION =====
   const undo = useCallback(() => {
     const canvas = canvasInstance.current;
 
     if (!canvas) {
+      console.warn("⚠️ [undo] No canvas instance");
       return;
     }
 
+    const pageHistory = getCurrentPageHistory();
+    const pageId = currentPageIdRef.current;
+
+    console.log(
+      `↩️  [undo][${pageId}] index=${pageHistory.index}, historyLen=${pageHistory.history.length}`,
+    );
+
     // No more undo states
-    if (historyIndexRef.current <= 0) {
+    if (pageHistory.index <= 0) {
+      console.log(
+        `⛔ [undo][${pageId}] Nothing to undo (index=${pageHistory.index})`,
+      );
       return;
     }
 
     isUndoRedoRef.current = true;
-    historyIndexRef.current--;
+    pageHistory.index--;
 
-    const state = historyRef.current[historyIndexRef.current];
+    const state = pageHistory.history[pageHistory.index];
+    console.log(`↩️  [undo][${pageId}] Restoring state #${pageHistory.index}`);
 
     try {
       const stateObj = JSON.parse(state);
@@ -115,32 +196,43 @@ export function useFabricCanvas({
         // Small delay to let Fabric.js finish
         setTimeout(() => {
           isUndoRedoRef.current = false;
+          console.log(`✅ [undo][${pageId}] Done`);
         }, 50);
       });
     } catch (error) {
       console.error("❌ Undo error:", error);
       isUndoRedoRef.current = false;
-      historyIndexRef.current++; // Restore index on error
+      pageHistory.index++; // Restore index on error
     }
-  }, []);
+  }, [getCurrentPageHistory]);
 
   // ===== REDO FUNCTION =====
   const redo = useCallback(() => {
     const canvas = canvasInstance.current;
 
     if (!canvas) {
+      console.warn("⚠️ [redo] No canvas instance");
       return;
     }
 
+    const pageHistory = getCurrentPageHistory();
+    const pageId = currentPageIdRef.current;
+
+    console.log(
+      `↪️  [redo][${pageId}] index=${pageHistory.index}, historyLen=${pageHistory.history.length}`,
+    );
+
     // No more redo states
-    if (historyIndexRef.current >= historyRef.current.length - 1) {
+    if (pageHistory.index >= pageHistory.history.length - 1) {
+      console.log(`⛔ [redo][${pageId}] Nothing to redo`);
       return;
     }
 
     isUndoRedoRef.current = true;
-    historyIndexRef.current++;
+    pageHistory.index++;
 
-    const state = historyRef.current[historyIndexRef.current];
+    const state = pageHistory.history[pageHistory.index];
+    console.log(`↪️  [redo][${pageId}] Restoring state #${pageHistory.index}`);
 
     try {
       const stateObj = JSON.parse(state);
@@ -152,14 +244,15 @@ export function useFabricCanvas({
         // Small delay to let Fabric.js finish
         setTimeout(() => {
           isUndoRedoRef.current = false;
+          console.log(`✅ [redo][${pageId}] Done`);
         }, 50);
       });
     } catch (error) {
       console.error("❌ Redo error:", error);
       isUndoRedoRef.current = false;
-      historyIndexRef.current--; // Restore index on error
+      pageHistory.index--; // Restore index on error
     }
-  }, []);
+  }, [getCurrentPageHistory]);
 
   function cleanupToolHandlers(canvas: fabric.Canvas) {
     const h = activeToolHandlersRef.current;
@@ -294,15 +387,16 @@ export function useFabricCanvas({
 
     canvas.clear();
 
-    // Clear history
-    historyRef.current = [];
-    historyIndexRef.current = -1;
+    // Clear current page's history
+    const pageHistory = getCurrentPageHistory();
+    pageHistory.history = [];
+    pageHistory.index = -1;
 
     // Save empty state
     setTimeout(() => {
       saveHistory();
     }, 100);
-  }, [saveHistory]);
+  }, [saveHistory, getCurrentPageHistory]);
 
   // -----------------------------
   // GET CANVAS INSTANCE
@@ -377,19 +471,21 @@ export function useFabricCanvas({
     ---------------------------------- */
       // Make all objects selectable ONLY when in select mode
       // OR when in a drawing tool mode (so we can see the active selection)
-      const shouldMakeSelectable =
-        _tool === "select" ||
-        _tool === "rect" ||
-        _tool === "circle" ||
-        _tool === "line";
+      const shouldMakeSelectable = _tool === "select";
 
       canvas.forEachObject((obj) => {
         obj.selectable = shouldMakeSelectable;
         obj.evented = shouldMakeSelectable;
         obj.hoverCursor = shouldMakeSelectable ? "move" : "default";
-        obj.hasControls = _tool === "select"; // Show controls only in select mode
+        obj.hasControls = shouldMakeSelectable; // Show controls only in select mode
         obj.hasBorders = shouldMakeSelectable;
       });
+
+      // Always discard active object when switching tools, unless we are in select mode
+      if (_tool !== "select") {
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+      }
 
       if (!canvas.freeDrawingBrush) {
         canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
@@ -403,9 +499,6 @@ export function useFabricCanvas({
 
       // Don't discard active selection when switching between drawing tools
       // Only discard when switching to non-selectable tools
-      if (_tool !== "select" && !shouldMakeSelectable) {
-        canvas.discardActiveObject();
-      }
 
       canvas.renderAll();
 
@@ -770,40 +863,228 @@ export function useFabricCanvas({
     return JSON.stringify(canvasJSON);
   }, []);
 
+  // Generation counter — incremented on every loadFromJson call so that if
+  // Fabric cancels an in-flight load (by starting a new one), the stale
+  // callback can detect it was superseded and skip seeding the wrong state.
+  const loadGenerationRef = useRef(0);
+
   // Load canvas from JSON
-  const loadFromJson = useCallback((json: string) => {
+  const loadFromJson = useCallback(
+    (json: string, targetPageId?: string) => {
+      const canvas = canvasInstance.current;
+      if (!canvas) return;
+
+      // 🔑 Use the explicitly passed targetPageId first, then the live ref.
+      const pageId = targetPageId || currentPageIdRef.current;
+
+      // Bump generation so any previous in-flight callback knows it is stale
+      loadGenerationRef.current += 1;
+      const myGeneration = loadGenerationRef.current;
+
+      console.log(
+        `📥 [loadFromJson] gen=${myGeneration} Loading for page "${pageId}" (targetPageId="${targetPageId}", refId="${currentPageIdRef.current}")`,
+      );
+
+      // Guard: suppress event-driven history saves during load
+      isLoadingPageRef.current = true;
+      isUndoRedoRef.current = true;
+      canvas.renderOnAddRemove = false;
+
+      const seedHistory = () => {
+        // Seed under the CURRENT live page ID at time of seeding,
+        // not the captured pageId — by now currentPageIdRef may have
+        // advanced to the real ID (e.g. first call captured "default").
+        const activePageId = currentPageIdRef.current;
+        try {
+          const canvasJSON = canvas.toJSON();
+          if (canvasJSON.objects) {
+            canvasJSON.objects = canvasJSON.objects.filter(
+              (obj: any) => !obj.excludeFromExport,
+            );
+          }
+          const state = JSON.stringify(canvasJSON);
+          pageHistoriesRef.current.set(activePageId, {
+            history: [state],
+            index: 0,
+          });
+          console.log(
+            `🌱 [loadFromJson] gen=${myGeneration} Seeded history for page "${activePageId}" (index=0, len=1)`,
+          );
+        } catch (error) {
+          console.error(
+            `❌ [loadFromJson] gen=${myGeneration} Failed to seed history for page "${activePageId}":`,
+            error,
+          );
+          pageHistoriesRef.current.set(activePageId, {
+            history: [],
+            index: -1,
+          });
+        }
+      };
+
+      canvas.loadFromJSON(json, () => {
+        // If a newer loadFromJson call has already started, our canvas state
+        // has been replaced — skip seeding to avoid clobbering the winner.
+        if (myGeneration !== loadGenerationRef.current) {
+          console.warn(
+            `⚠️ [loadFromJson] gen=${myGeneration} superseded by gen=${loadGenerationRef.current} — skipping seed`,
+          );
+          return;
+        }
+
+        canvas.renderOnAddRemove = true;
+        canvas.renderAll();
+        seedHistory();
+
+        setTimeout(() => {
+          isUndoRedoRef.current = false;
+          isLoadingPageRef.current = false;
+          console.log(
+            `✅ [loadFromJson] gen=${myGeneration} Guards released for page "${currentPageIdRef.current}"`,
+          );
+        }, 150);
+      });
+
+      // Fallback: if Fabric's callback never fires (empty JSON "{}" edge case
+      // or StrictMode double-invoke cancellation), release guards and seed.
+      setTimeout(() => {
+        if (myGeneration !== loadGenerationRef.current) return; // superseded
+        if (!isLoadingPageRef.current && !isUndoRedoRef.current) return; // already released
+
+        console.warn(
+          `⚠️ [loadFromJson] gen=${myGeneration} Fabric callback did not fire within 500ms — seeding manually`,
+        );
+        canvas.renderOnAddRemove = true;
+        canvas.renderAll();
+        seedHistory();
+        isUndoRedoRef.current = false;
+        isLoadingPageRef.current = false;
+      }, 500);
+    },
+    [], // ✅ No dependencies — uses refs only
+  );
+
+  // Save current page state (for page switching)
+  const saveCurrentPageState = useCallback(() => {
     const canvas = canvasInstance.current;
     if (!canvas) return;
 
-    // Don't save history during load
-    // isUndoRedoRef.current = true;
+    const pageHistory = getCurrentPageHistory();
+    const pageId = currentPageIdRef.current;
 
-    // Disable render during load
-    canvas.renderOnAddRemove = false;
+    try {
+      const json = canvas.toJSON();
+      if (json.objects) {
+        json.objects = json.objects.filter(
+          (obj: any) => !obj.excludeFromExport,
+        );
+      }
+      const state = JSON.stringify(json);
 
-    canvas.loadFromJSON(json, () => {
-      canvas.renderOnAddRemove = true;
-      canvas.renderAll();
+      // Update current history state
+      if (pageHistory.index >= 0) {
+        pageHistory.history[pageHistory.index] = state;
+        console.log(
+          `💾 [saveCurrentPageState] Saved current state for page "${pageId}" at index ${pageHistory.index}`,
+        );
+      } else {
+        console.warn(
+          `⚠️ [saveCurrentPageState] No history to update for page "${pageId}" (index=${pageHistory.index})`,
+        );
+      }
+    } catch (error) {
+      console.error("❌ Error saving page state:", error);
+    }
+  }, [getCurrentPageHistory]);
 
-      // Reset history with loaded state
-      historyRef.current = [];
-      historyIndexRef.current = -1;
+  // Load page state (for page switching)
+  // targetPageId: the page we are switching TO — must be passed explicitly because the React prop (currentPageId) may not yet have updated when this is called.
+  const loadPageState = useCallback(
+    (canvasData: string, targetPageId?: string) => {
+      const canvas = canvasInstance.current;
+      if (!canvas) return;
 
+      // 🔑 FIX: Use the explicitly passed targetPageId first, then the live ref.
+      const pageId = targetPageId || currentPageIdRef.current;
+      console.log(
+        `🔄 [loadPageState] Switching to page "${pageId}" (targetPageId="${targetPageId}", refId="${currentPageIdRef.current}")`,
+      );
+      console.log(
+        `🗂️  [loadPageState] pageHistoriesRef keys: [${Array.from(pageHistoriesRef.current.keys()).join(", ")}]`,
+      );
+      console.log(
+        `🗂️  [loadPageState] Target page has existing history: ${pageHistoriesRef.current.has(pageId)}`,
+      );
+
+      // Guard: suppress all history saves during page load
+      isLoadingPageRef.current = true;
+      isUndoRedoRef.current = true;
+      canvas.renderOnAddRemove = false;
+
+      // Parse canvas data once; fall back to empty object on bad/empty JSON
       try {
-        const canvasJSON = canvas.toJSON();
-        if (canvasJSON.objects) {
-          canvasJSON.objects = canvasJSON.objects.filter(
-            (obj: any) => !obj.excludeFromExport,
+        if (canvasData && canvasData !== "{}") {
+          JSON.parse(canvasData); // validate
+        }
+      } catch {
+        console.warn(
+          `⚠️ [loadPageState] Invalid canvasData for page "${pageId}", falling back to empty`,
+        );
+        canvasData = "{}";
+      }
+
+      canvas.loadFromJSON(canvasData, () => {
+        canvas.renderOnAddRemove = true;
+        canvas.renderAll();
+
+        // Seed history for the target page if it has never been visited.
+        if (!pageHistoriesRef.current.has(pageId)) {
+          try {
+            const json = canvas.toJSON();
+            if (json.objects) {
+              json.objects = json.objects.filter(
+                (obj: any) => !obj.excludeFromExport,
+              );
+            }
+            const state = JSON.stringify(json);
+            pageHistoriesRef.current.set(pageId, {
+              history: [state],
+              index: 0,
+            });
+            console.log(
+              `🌱 [loadPageState] Seeded initial history for new page "${pageId}"`,
+            );
+          } catch {
+            pageHistoriesRef.current.set(pageId, { history: [], index: -1 });
+            console.warn(
+              `⚠️ [loadPageState] Failed to seed history for page "${pageId}"`,
+            );
+          }
+        } else {
+          // Page already has history — preserve it intact so undo/redo continues to work
+          const existing = pageHistoriesRef.current.get(pageId)!;
+          console.log(
+            `♻️  [loadPageState] Restored existing history for page "${pageId}": index=${existing.index}, len=${existing.history.length}`,
           );
         }
-        const state = JSON.stringify(canvasJSON);
 
-        historyRef.current.push(state);
-        historyIndexRef.current = 0;
-      } catch (error) {
-        console.error("❌ Error saving initial state:", error);
-      }
-    });
+        // Small delay to let any queued event handlers fire (and be suppressed)
+        setTimeout(() => {
+          isUndoRedoRef.current = false;
+          isLoadingPageRef.current = false;
+          console.log(
+            `✅ [loadPageState] Guards released for page "${pageId}"`,
+          );
+        }, 150);
+      });
+    },
+    [], // ✅ No dependencies needed — uses refs
+  );
+
+  // Remove history entries for a deleted page
+  const clearPageHistory = useCallback((pageId: string) => {
+    console.log(`🗑️  [clearPageHistory] Clearing history for page "${pageId}"`);
+    pageHistoriesRef.current.delete(pageId);
   }, []);
 
   // -----------------------------
@@ -816,7 +1097,7 @@ export function useFabricCanvas({
     const fab = new fabric.Canvas(el, {
       isDrawingMode: tool === "brush",
       selection: tool === "select",
-      backgroundColor: "#FFFFFF",
+      backgroundColor: getCanvasBackgroundColor(),
     });
 
     canvasInstance.current = fab;
@@ -864,9 +1145,12 @@ export function useFabricCanvas({
 
     const handleHistoryEvent = () => {
       setTimeout(() => {
-        if (!isUndoRedoRef.current) {
-          saveHistory();
+        if (!isUndoRedoRef.current && !isLoadingPageRef.current) {
+          saveHistoryRef.current();
         } else {
+          console.log(
+            `⏸️  [handleHistoryEvent] Skipped — isUndoRedo=${isUndoRedoRef.current}, isLoadingPage=${isLoadingPageRef.current}`,
+          );
         }
       }, 100);
     };
@@ -874,10 +1158,13 @@ export function useFabricCanvas({
     fab.on("object:modified", handleHistoryEvent);
     fab.on("object:removed", handleHistoryEvent);
 
-    // Save initial empty state
-    setTimeout(() => {
-      saveHistory();
-    }, 300);
+    console.log("🎨 [useFabricCanvas] Canvas mounted — listeners registered");
+    // NOTE: We do NOT save an initial empty state here anymore.
+    // loadFromJson (called by useBoard on mount) seeds the initial history entry
+    // for the correct pageId itself. A competing setTimeout here caused a race
+    // condition where this 300ms save fired while loadFromJson's guards were
+    // still held (from a second loadFromJson call), resulting in history being
+    // permanently empty (index=-1) until the user drew something.
 
     return () => {
       fab.off("object:added", handleHistoryEvent);
@@ -890,7 +1177,7 @@ export function useFabricCanvas({
       fab.dispose();
       canvasInstance.current = null;
     };
-  }, [saveHistory]);
+  }, [getCanvasBackgroundColor, hasThemeChanged]); // NOTE: saveHistory removed — use saveHistoryRef instead to prevent canvas re-creation
 
   // -----------------------------
   // UPDATE SETTINGS WHEN PROPS CHANGE
@@ -914,5 +1201,8 @@ export function useFabricCanvas({
     getThumbnail,
     undo,
     redo,
+    saveCurrentPageState,
+    loadPageState,
+    clearPageHistory,
   };
 }

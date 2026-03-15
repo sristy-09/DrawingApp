@@ -13,13 +13,31 @@ import { Label } from "../../core/components/ui/label";
 import { Input } from "../../core/components/ui/input";
 import { useSignup } from "../hooks/useSignup";
 import { Link } from "react-router";
+import { SaveGuestBoardDialog } from "./SaveGuestBoardDialog";
 
 function SignUpPage() {
-  const { handleSubmit, myForm, handleChange, loading, errors } = useSignup();
+  const {
+    handleSubmit,
+    myForm,
+    handleChange,
+    loading,
+    errors,
+    showSaveDialog,
+    handleSaveGuestBoard,
+    handleDiscardGuestBoard,
+    handleCancelSaveDialog,
+  } = useSignup();
   const API_URL = import.meta.env.VITE_API_URL;
 
   return (
-    <div className="flex justify-center items-center mt-40">
+    <>
+      <SaveGuestBoardDialog
+        open={showSaveDialog}
+        onSave={handleSaveGuestBoard}
+        onDiscard={handleDiscardGuestBoard}
+        onCancel={handleCancelSaveDialog}
+      />
+      <div className="flex justify-center items-center mt-40">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Sign Up to register</CardTitle>
@@ -107,6 +125,7 @@ function SignUpPage() {
         </CardFooter>
       </Card>
     </div>
+    </>
   );
 }
 

@@ -13,13 +13,30 @@ import { Label } from "../../core/components/ui/label";
 import { FaGoogle } from "react-icons/fa";
 import { Link } from "react-router";
 import { useLogin } from "../hooks/useLogin";
+import { SaveGuestBoardDialog } from "./SaveGuestBoardDialog";
 
 function LoginPage() {
-  const { myForm, handleChange, handleSubmit, errors } = useLogin();
+  const {
+    myForm,
+    handleChange,
+    handleSubmit,
+    errors,
+    showSaveDialog,
+    handleSaveGuestBoard,
+    handleDiscardGuestBoard,
+    handleCancelSaveDialog,
+  } = useLogin();
 
   const API_URL = import.meta.env.VITE_API_URL;
   return (
-    <div className="flex justify-center items-center mt-40">
+    <>
+      <SaveGuestBoardDialog
+        open={showSaveDialog}
+        onSave={handleSaveGuestBoard}
+        onDiscard={handleDiscardGuestBoard}
+        onCancel={handleCancelSaveDialog}
+      />
+      <div className="flex justify-center items-center mt-40">
       <Card className="w-full max-w-sm ">
         <CardHeader>
           <CardTitle>Login to your account</CardTitle>
@@ -87,6 +104,7 @@ function LoginPage() {
         </CardFooter>
       </Card>
     </div>
+    </>
   );
 }
 
