@@ -8,6 +8,7 @@ import {
   FaEraser,
   FaHandPaper,
   FaGripVertical,
+  FaFont,
 } from "react-icons/fa";
 import type { Tool, ToolbarProps } from "../types/types";
 import { useDragToolBar } from "../hooks/useDragToolBar";
@@ -20,6 +21,7 @@ export const toolIcons: Record<Tool, JSX.Element> = {
   rect: <FaRegSquare />,
   circle: <FaRegCircle />,
   line: <FaMinus />,
+  text: <FaFont />,
 };
 
 const Toolbar: React.FC<ToolbarProps> = ({

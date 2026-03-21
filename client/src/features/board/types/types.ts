@@ -7,7 +7,8 @@ export type Tool =
   | "pan"
   | "rect"
   | "circle"
-  | "line";
+  | "line"
+  | "text";
 export type SaveStatus = "idle" | "saving" | "saved";
 
 export interface Page {
