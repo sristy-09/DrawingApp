@@ -97,7 +97,7 @@ export function useBoard() {
   const toolOptionsRef = useRef<HTMLDivElement>(null);
 
   const handleClear = () => clearCanvas();
-  const handleSave = () => saveBoard(false);
+  const handleSave = () => saveBoard();
 
   const handleToolChange = (newTool: Tool) => {
     setTool(newTool);
@@ -153,7 +153,7 @@ export function useBoard() {
   // ─── FIX #3 & #5: saveBoard is now fully async and waits one animation
   // frame before serialising so Fabric has finished painting.
   const saveBoard = useCallback(
-    async (includeThumbnail = false, forceImmediate = false) => {
+    async (forceImmediate = false) => {
       if (!canvasRef.current || isSavingRef.current) return;
 
       // ─── FIX #2: drop saves queued before a page switch
@@ -184,7 +184,7 @@ export function useBoard() {
       if (isSwitchingPageRef.current) return;
 
       const json = canvasRef.current.saveToJson();
-      if (!includeThumbnail && json === lastSavedDataRef.current) return;
+      if (json === lastSavedDataRef.current) return;
 
       // GUEST USER
       if (!isAuthenticated) {
@@ -208,7 +208,8 @@ export function useBoard() {
           canvasData: json,
         };
 
-        if (includeThumbnail && !isInteracting()) {
+        // Always generate and include thumbnail with every save
+        if (!isInteracting()) {
           const thumbnail = canvasRef.current.getThumbnail?.(400, 300);
           if (thumbnail) payload.thumbnail = thumbnail;
         }
@@ -249,21 +250,8 @@ export function useBoard() {
       const timeSinceLastInteraction =
         Date.now() - lastInteractionTimeRef.current;
       if (timeSinceLastInteraction < 1000) return;
-      saveBoard(false);
+      saveBoard();
     }, 3000),
-    [saveBoard],
-  );
-
-  const debouncedThumbnailSave = useCallback(
-    debounce(() => {
-      if (!hasChangedRef.current) return;
-      if (isInteracting()) return;
-      if (isSwitchingPageRef.current) return;
-      const timeSinceLastInteraction =
-        Date.now() - lastInteractionTimeRef.current;
-      if (timeSinceLastInteraction < 2000) return;
-      saveBoard(true);
-    }, 8000),
     [saveBoard],
   );
 
@@ -272,8 +260,7 @@ export function useBoard() {
     lastInteractionTimeRef.current = Date.now();
     if (isInteracting()) return; // don't queue saves while drawing/typing
     debouncedSave();
-    debouncedThumbnailSave();
-  }, [debouncedSave, debouncedThumbnailSave]);
+  }, [debouncedSave]);
 
   // Set guest mode on mount
   useEffect(() => {
@@ -356,7 +343,6 @@ export function useBoard() {
         lastInteractionTimeRef.current = Date.now();
         if (hasChangedRef.current) {
           debouncedSave();
-          debouncedThumbnailSave();
         }
       }, 150);
     };
@@ -414,7 +400,7 @@ export function useBoard() {
       // so we re-check after a frame to catch the genuine exit case.
       if (canvasRef.current?.isCreatingNewText?.()) return;
       if (hasChangedRef.current) {
-        setTimeout(() => saveBoard(false, true), 100);
+        setTimeout(() => saveBoard(true), 100);
       }
     };
 
@@ -447,7 +433,6 @@ export function useBoard() {
 
     return () => {
       debouncedSave.cancel();
-      debouncedThumbnailSave.cancel();
       canvas.off("mouse:down", handleMouseDown);
       canvas.off("mouse:up", handleMouseUp);
       canvas.off("text:editing:entered", handleTextEditingEntered);
@@ -466,7 +451,6 @@ export function useBoard() {
     };
   }, [
     debouncedSave,
-    debouncedThumbnailSave,
     handleCanvasChange,
     saveBoard,
     activeDrawingTool,
@@ -480,7 +464,7 @@ export function useBoard() {
       if (isSwitchingPageRef.current) return;
       const timeSinceLastInteraction =
         Date.now() - lastInteractionTimeRef.current;
-      if (timeSinceLastInteraction >= 5000) saveBoard(false);
+      if (timeSinceLastInteraction >= 5000) saveBoard();
     }, 10000);
     return () => clearInterval(periodicSave);
   }, [saveBoard]);
@@ -593,7 +577,6 @@ export function useBoard() {
 
     // ─── FIX #2: cancel any pending debounced saves immediately
     debouncedSave.cancel();
-    debouncedThumbnailSave.cancel();
     isSwitchingPageRef.current = true;
     setIsLoadingPage(true);
 
@@ -783,7 +766,7 @@ export function useBoard() {
     setColor: handleColorChange,
     setBrushWidth: handleBrushWidthChange,
     clearCanvas,
-    saveBoard: () => saveBoard(false),
+    saveBoard: () => saveBoard(),
     saveStatus,
     zoom,
     handleZoomIn,

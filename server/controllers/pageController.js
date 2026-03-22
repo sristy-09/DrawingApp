@@ -157,6 +157,8 @@ export const updatePageCanvas = async (req, res) => {
       return res.status(accessCheck.status).json({ message: accessCheck.error });
     }
 
+    const board = accessCheck.board;
+
     // Use findOneAndUpdate for atomic operation
     const page = await Page.findOneAndUpdate(
       { _id: pageId, board: boardId },
@@ -165,11 +167,17 @@ export const updatePageCanvas = async (req, res) => {
         ...(thumbnail && { thumbnail }),
         updatedAt: Date.now()
       },
-      { new: true, select: "_id name updatedAt" } // Return minimal data
+      { new: true, select: "_id name updatedAt thumbnail" } // Return minimal data including thumbnail
     );
 
     if (!page) {
       return res.status(404).json({ message: "Page not found" });
+    }
+
+    // If this is the current page and a thumbnail was provided, update the board's thumbnail
+    if (thumbnail && board.currentPageId && board.currentPageId.equals(pageId)) {
+      board.thumbnail = thumbnail;
+      await board.save();
     }
 
     res.json({ message: "Canvas saved successfully", page });

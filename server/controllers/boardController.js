@@ -185,9 +185,13 @@ export const updateBoard = async (req, res) => {
 
     // Switch current page
     if (currentPageId) {
-      const pageExists = await Page.exists({ _id: currentPageId, board: id });
-      if (pageExists) {
+      const page = await Page.findOne({ _id: currentPageId, board: id });
+      if (page) {
         board.currentPageId = currentPageId;
+        // Update board thumbnail to match the new current page's thumbnail
+        if (page.thumbnail) {
+          board.thumbnail = page.thumbnail;
+        }
       } else {
         return res.status(400).json({ message: "Invalid page ID" });
       }
