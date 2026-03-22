@@ -35,7 +35,7 @@ function UserDashboard() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-background via-background to-muted/20">
         <div className="flex flex-col items-center gap-3">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           <p className="text-sm text-muted-foreground">Loading dashboard...</p>
@@ -56,13 +56,13 @@ function UserDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="min-h-screen bg-linear-to-br from-background via-background to-muted/20">
       {/* Modern Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-xl supports-backdrop-filter:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-6">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-500">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-black">
               <Palette className="h-5 w-5 text-white" />
             </div>
             <div className="flex flex-col">
@@ -80,7 +80,7 @@ function UserDashboard() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-9 w-9 rounded-full p-0">
                   <Avatar className="h-9 w-9">
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white text-xs font-semibold">
+                    <AvatarFallback className="bg-gray-500 text-white text-xs font-semibold">
                       {getUserInitials()}
                     </AvatarFallback>
                   </Avatar>
@@ -89,7 +89,7 @@ function UserDashboard() {
               <DropdownMenuContent align="end" className="w-56">
                 <div className="flex items-center gap-2 p-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white text-xs">
+                    <AvatarFallback className="bg-gray-500 text-white text-xs">
                       {getUserInitials()}
                     </AvatarFallback>
                   </Avatar>
@@ -134,7 +134,7 @@ function UserDashboard() {
             <Button
               onClick={() => setShowNewBoardForm(true)}
               size="lg"
-              className="h-11 px-6 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 hover:from-violet-600 hover:via-purple-600 hover:to-fuchsia-600 text-white shadow-lg hover:shadow-xl transition-all"
+              className="h-11 px-6 bg-black hover:bg-gray-700 text-white shadow-lg hover:shadow-xl transition-all"
             >
               <Plus className="mr-2 h-5 w-5" />
               New Board
@@ -145,17 +145,18 @@ function UserDashboard() {
         {/* Boards Section */}
         {boards.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="rounded-full bg-gradient-to-br from-violet-100 to-fuchsia-100 dark:from-violet-950 dark:to-fuchsia-950 p-6 mb-6">
-              <Grid3x3 className="h-12 w-12 text-violet-600 dark:text-violet-400" />
+            <div className="rounded-full bg-black p-6 mb-6">
+              <Grid3x3 className="h-12 w-12 text-white" />
             </div>
             <h3 className="text-2xl font-semibold mb-2">No boards yet</h3>
             <p className="text-muted-foreground mb-8 max-w-md">
-              Start creating amazing drawings and diagrams. Your boards will appear here.
+              Start creating amazing drawings and diagrams. Your boards will
+              appear here.
             </p>
             <Button
               onClick={() => setShowNewBoardForm(true)}
               size="lg"
-              className="bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 hover:from-violet-600 hover:via-purple-600 hover:to-fuchsia-600 text-white"
+              className="bg-black hover:bg-gray-700 text-white"
             >
               <Plus className="mr-2 h-5 w-5" />
               Create Your First Board
