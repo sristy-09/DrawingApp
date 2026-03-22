@@ -49,6 +49,7 @@ const FabricCanvas = React.forwardRef(
       saveCurrentPageState,
       loadPageState,
       clearPageHistory,
+      isCreatingNewText,
     } = useFabricCanvas({
       color,
       brushWidth,
@@ -76,6 +77,7 @@ const FabricCanvas = React.forwardRef(
       saveCurrentPageState,
       loadPageState,
       clearPageHistory,
+      isCreatingNewText,
     }));
 
     return <canvas ref={canvasRef} className="border w-screen h-screen" />;

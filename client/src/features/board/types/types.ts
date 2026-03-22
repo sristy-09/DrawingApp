@@ -54,6 +54,8 @@ export interface FabricCanvasRef {
   saveCurrentPageState: () => void;
   loadPageState: (canvasData: string, targetPageId?: string) => void;
   clearPageHistory: (pageId: string) => void;
+  /** True while a new textbox is being created (click-to-new-text transition) */
+  isCreatingNewText: () => boolean;
 }
 
 export interface FabricCanvasProps {
