@@ -408,8 +408,11 @@ export function useBoard() {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
       }
-      // ─── FIX #5: forceImmediate bypasses the interaction guard so the
-      // save is not skipped even if the counter hasn't fully settled.
+      // If the user clicked blank canvas to create a NEW textbox, this exit
+      // fired as a side-effect of the same click — skip the save.
+      // isCreatingNewText() stays true until enterEditing() runs (rAF),
+      // so we re-check after a frame to catch the genuine exit case.
+      if (canvasRef.current?.isCreatingNewText?.()) return;
       if (hasChangedRef.current) {
         setTimeout(() => saveBoard(false, true), 100);
       }

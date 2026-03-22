@@ -42,9 +42,15 @@ export function useFabricCanvas({
   // Text editing state
   const editingTextRef = useRef<fabric.Textbox | null>(null);
   const isEditingTextRef = useRef<boolean>(false);
-  const textCursorPositionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+  const textCursorPositionRef = useRef<{ start: number; end: number }>({
+    start: 0,
+    end: 0,
+  });
+  // Set to true just before creating a new textbox via a canvas click so the
+  // text:editing:exited handler (firing for the previous box in the same click)
+  // knows to skip its save — the user is continuing to write, not finishing.
+  const isCreatingNewTextRef = useRef<boolean>(false);
 
-  
   // UNDO/REDO STATE - Per-page history
   const pageHistoriesRef = useRef<
     Map<string, { history: string[]; index: number }>
@@ -296,77 +302,111 @@ export function useFabricCanvas({
   }
 
   // Text editing helper functions
-  const exitTextEditing = useCallback((canvas: fabric.Canvas) => {
-    if (editingTextRef.current && isEditingTextRef.current) {
-      const textObj = editingTextRef.current;
-      
-      // Store cursor position before exiting
-      if (textObj.selectionStart !== undefined && textObj.selectionEnd !== undefined) {
-        textCursorPositionRef.current = {
-          start: textObj.selectionStart,
-          end: textObj.selectionEnd
-        };
-      }
-      
-      textObj.exitEditing();
-      
-      // Remove empty or whitespace-only text objects
-      const text = textObj.text?.trim() || '';
-      if (text === '') {
-        canvas.remove(textObj);
-        canvas.requestRenderAll();
+  const exitTextEditing = useCallback(
+    (canvas: fabric.Canvas) => {
+      if (editingTextRef.current && isEditingTextRef.current) {
+        const textObj = editingTextRef.current;
+
+        // Store cursor position before exiting
+        if (
+          textObj.selectionStart !== undefined &&
+          textObj.selectionEnd !== undefined
+        ) {
+          textCursorPositionRef.current = {
+            start: textObj.selectionStart,
+            end: textObj.selectionEnd,
+          };
+        }
+
+        textObj.exitEditing();
+
+        // Remove empty or whitespace-only text objects
+        const text = textObj.text?.trim() || "";
+        if (text === "") {
+          canvas.remove(textObj);
+          canvas.requestRenderAll();
+        }
+
+        editingTextRef.current = null;
+        isEditingTextRef.current = false;
+
+        // Don't save if we're mid-creation of a new textbox (same-click transition)
+        if (isCreatingNewTextRef.current) return;
+
         setTimeout(() => saveHistory(), 0);
       }
-      
-      editingTextRef.current = null;
-      isEditingTextRef.current = false;
-    }
-  }, [saveHistory]);
+    },
+    [saveHistory],
+  );
 
-  const enterTextEditing = useCallback((textObj: fabric.Textbox, canvas: fabric.Canvas) => {
-    // Exit any existing text editing first
-    exitTextEditing(canvas);
-    
-    editingTextRef.current = textObj;
-    isEditingTextRef.current = true;
-    
-    textObj.enterEditing();
-    
-    // Restore cursor position if available
-    const savedPosition = textCursorPositionRef.current;
-    if (savedPosition && textObj.text) {
-      const textLength = textObj.text.length;
-      textObj.selectionStart = Math.min(savedPosition.start, textLength);
-      textObj.selectionEnd = Math.min(savedPosition.end, textLength);
-    }
-    
-    canvas.requestRenderAll();
-  }, [exitTextEditing]);
+  const enterTextEditing = useCallback(
+    (textObj: fabric.Textbox, canvas: fabric.Canvas) => {
+      // Exit any existing text editing first
+      exitTextEditing(canvas);
 
-  const createTextBox = useCallback((x: number, y: number, canvas: fabric.Canvas) => {
-    const textBox = new fabric.Textbox('', {
-      left: x,
-      top: y,
-      width: 200,
-      fontSize: 16,
-      fontFamily: 'Arial',
-      fill: color,
-      selectable: true,
-      evented: true,
-      hasControls: true,
-      hasBorders: true,
-      lockScalingFlip: true,
-      splitByGrapheme: true,
-    });
+      editingTextRef.current = textObj;
+      isEditingTextRef.current = true;
 
-    canvas.add(textBox);
-    canvas.setActiveObject(textBox);
-    
-    // Enter editing mode immediately
-    enterTextEditing(textBox, canvas);
-    
-    return textBox;
-  }, [color, enterTextEditing]);
+      textObj.enterEditing();
+
+      // Restore cursor position if available
+      const savedPosition = textCursorPositionRef.current;
+      if (savedPosition && textObj.text) {
+        const textLength = textObj.text.length;
+        textObj.selectionStart = Math.min(savedPosition.start, textLength);
+        textObj.selectionEnd = Math.min(savedPosition.end, textLength);
+      }
+
+      canvas.requestRenderAll();
+    },
+    [exitTextEditing],
+  );
+
+  const createTextBox = useCallback(
+    (x: number, y: number, canvas: fabric.Canvas) => {
+      const textBox = new fabric.Textbox("", {
+        left: x,
+        top: y,
+        width: 200,
+        fontSize: 16,
+        fontFamily: "Arial",
+        fill: color,
+        selectable: true,
+        evented: true,
+        hasControls: true,
+        hasBorders: true,
+        lockScalingFlip: true,
+        splitByGrapheme: true,
+      });
+
+      // Raise the flag BEFORE add() so that text:editing:exited (which fires
+      // synchronously when the previous textbox loses focus during this click)
+      // knows a new box is about to be created and skips its premature save.
+      isCreatingNewTextRef.current = true;
+
+      // Suppress object:added so useBoard's handleCanvasChange doesn't fire
+      // a premature save before the user has typed anything.
+      canvas.renderOnAddRemove = false;
+      canvas.add(textBox);
+      canvas.renderOnAddRemove = true;
+
+      canvas.setActiveObject(textBox);
+
+      // Defer enterEditing past Fabric's own mousedown post-processing.
+      // Calling enterEditing() synchronously inside mouse:down gets cancelled
+      // by Fabric's internal cleanup that runs after all mouse:down handlers
+      // finish — the cursor would never appear on the first click.
+      requestAnimationFrame(() => {
+        enterTextEditing(textBox, canvas);
+        // Clear the flag after editing has started — any subsequent exit should
+        // now be treated as a genuine "user finished writing" event.
+        isCreatingNewTextRef.current = false;
+      });
+
+      return textBox;
+    },
+    [color, enterTextEditing],
+  );
 
   // -----------------------------
   // ZOOM FUNCTIONS
@@ -572,11 +612,11 @@ export function useFabricCanvas({
         obj.hoverCursor = shouldMakeSelectable ? "move" : "default";
         obj.hasControls = shouldMakeSelectable; // Show controls only in select mode
         obj.hasBorders = shouldMakeSelectable;
-        
+
         // Special handling for text objects
         if (obj instanceof fabric.Textbox) {
           // In text mode: editable but not resizable
-          // In select mode: movable + resizable  
+          // In select mode: movable + resizable
           // In other modes: not selectable
           if (_tool === "text") {
             obj.selectable = true;
@@ -970,29 +1010,40 @@ export function useFabricCanvas({
       if (_tool === "text" || _tool === "select") {
         const onDown = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
           const target = e.target;
-          
-          // If clicking on an existing text object in text or select mode
-          if (target && target instanceof fabric.Textbox && (_tool === "text" || _tool === "select")) {
-            // Only allow editing in text mode or select mode
-            enterTextEditing(target, canvas);
+
+          // Clicking an existing text object → enter editing after Fabric's
+          // own mousedown processing completes (same rAF deferral as createTextBox)
+          if (
+            target &&
+            target instanceof fabric.Textbox &&
+            (_tool === "text" || _tool === "select")
+          ) {
+            requestAnimationFrame(() => {
+              enterTextEditing(target, canvas);
+            });
             return;
           }
-          
-          // If in text mode and clicking on empty canvas, create new text
+
+          // If in text mode and clicking on empty canvas, create new text.
+          // createTextBox already defers enterEditing via requestAnimationFrame
+          // and suppresses object:added to prevent a premature save.
           if (_tool === "text" && !target) {
             const pointer = canvas.getPointer(e.e);
             createTextBox(pointer.x, pointer.y, canvas);
-            
-            // Save history after creating text
-            setTimeout(() => saveHistory(), 100);
           }
         };
 
-        const onDblClick = (e: fabric.TPointerEventInfo<fabric.TPointerEvent>) => {
+        const onDblClick = (
+          e: fabric.TPointerEventInfo<fabric.TPointerEvent>,
+        ) => {
           const target = e.target;
-          
+
           // Double-click on text object in any mode (text or select) enters editing
-          if (target && target instanceof fabric.Textbox && (_tool === "text" || _tool === "select")) {
+          if (
+            target &&
+            target instanceof fabric.Textbox &&
+            (_tool === "text" || _tool === "select")
+          ) {
             enterTextEditing(target, canvas);
           }
         };
@@ -1019,26 +1070,34 @@ export function useFabricCanvas({
           const textObj = e.target;
           if (textObj instanceof fabric.Textbox) {
             // Store cursor position
-            if (textObj.selectionStart !== undefined && textObj.selectionEnd !== undefined) {
+            if (
+              textObj.selectionStart !== undefined &&
+              textObj.selectionEnd !== undefined
+            ) {
               textCursorPositionRef.current = {
                 start: textObj.selectionStart,
-                end: textObj.selectionEnd
+                end: textObj.selectionEnd,
               };
             }
-            
+
             // Remove empty text objects
-            const text = textObj.text?.trim() || '';
-            if (text === '') {
+            const text = textObj.text?.trim() || "";
+            if (text === "") {
               canvas.remove(textObj);
               canvas.requestRenderAll();
-              setTimeout(() => saveHistory(), 0);
-            } else {
-              // Save history for text content changes
-              setTimeout(() => saveHistory(), 0);
             }
-            
+
             editingTextRef.current = null;
             isEditingTextRef.current = false;
+
+            // If the user clicked blank canvas to start a NEW textbox, this
+            // exit event fired as a side-effect of that same click.  Don't
+            // save here — we're not done writing, just moving to a new spot.
+            // The flag is cleared by createTextBox after enterEditing starts.
+            if (isCreatingNewTextRef.current) return;
+
+            // Genuine exit (Escape, click outside, tool switch) — save history.
+            setTimeout(() => saveHistory(), 0);
           }
         };
 
@@ -1419,5 +1478,6 @@ export function useFabricCanvas({
     saveCurrentPageState,
     loadPageState,
     clearPageHistory,
+    isCreatingNewText: () => isCreatingNewTextRef.current,
   };
 }
