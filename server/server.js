@@ -6,6 +6,7 @@ import cors from "cors";
 import { connectDB } from "./config/db.js";
 import user from "./routes/auth.js";
 import board from "./routes/board.js";
+import page from "./routes/page.js";
 import "./config/passport.js";
 import path from "path";
 
@@ -24,6 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/auth", user);
 app.use("/board", board);
+app.use("/board", page);
 
 // Serve frontend build
 app.use(express.static(path.join(__dirname, "/client/dist")));
