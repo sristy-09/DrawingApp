@@ -66,9 +66,6 @@ export function useFabricCanvas({
   const currentPageIdRef = useRef<string>(currentPageId || "default");
   const nextPageId = currentPageId || "default";
   if (currentPageIdRef.current !== nextPageId) {
-    console.log(
-      `📄 [useFabricCanvas] currentPageId updated: "${currentPageIdRef.current}" → "${nextPageId}"`,
-    );
     currentPageIdRef.current = nextPageId;
   }
 
@@ -76,9 +73,6 @@ export function useFabricCanvas({
   const getCurrentPageHistory = useCallback(() => {
     const pageId = currentPageIdRef.current;
     if (!pageHistoriesRef.current.has(pageId)) {
-      console.log(
-        `📋 [History] Creating new history entry for page "${pageId}"`,
-      );
       pageHistoriesRef.current.set(pageId, { history: [], index: -1 });
     }
     return pageHistoriesRef.current.get(pageId)!;
@@ -111,9 +105,6 @@ export function useFabricCanvas({
 
     // Skip saving during undo/redo or page loading
     if (isUndoRedoRef.current || isLoadingPageRef.current) {
-      console.log(
-        `⏸️  [saveHistory] Skipped — isUndoRedo=${isUndoRedoRef.current}, isLoadingPage=${isLoadingPageRef.current}`,
-      );
       return;
     }
 
@@ -128,7 +119,6 @@ export function useFabricCanvas({
       const state = JSON.stringify(json);
 
       const pageHistory = getCurrentPageHistory();
-      const pageId = currentPageIdRef.current; // for logging
 
       // Don't save if state hasn't changed
       const lastState = pageHistory.history[pageHistory.index];
@@ -138,9 +128,6 @@ export function useFabricCanvas({
 
       // Remove any redo states
       if (pageHistory.index < pageHistory.history.length - 1) {
-        console.log(
-          `✂️  [saveHistory][${pageId}] Trimming ${pageHistory.history.length - 1 - pageHistory.index} redo state(s)`,
-        );
         pageHistory.history = pageHistory.history.slice(
           0,
           pageHistory.index + 1,
@@ -156,10 +143,6 @@ export function useFabricCanvas({
         pageHistory.history.shift();
         pageHistory.index--;
       }
-
-      console.log(
-        `💾 [saveHistory][${pageId}] Saved state #${pageHistory.index} (total: ${pageHistory.history.length})`,
-      );
     } catch (error) {
       console.error("❌ Error saving history:", error);
     }
@@ -182,17 +165,9 @@ export function useFabricCanvas({
     }
 
     const pageHistory = getCurrentPageHistory();
-    const pageId = currentPageIdRef.current;
-
-    console.log(
-      `↩️  [undo][${pageId}] index=${pageHistory.index}, historyLen=${pageHistory.history.length}`,
-    );
 
     // No more undo states
     if (pageHistory.index <= 0) {
-      console.log(
-        `⛔ [undo][${pageId}] Nothing to undo (index=${pageHistory.index})`,
-      );
       return;
     }
 
@@ -200,7 +175,6 @@ export function useFabricCanvas({
     pageHistory.index--;
 
     const state = pageHistory.history[pageHistory.index];
-    console.log(`↩️  [undo][${pageId}] Restoring state #${pageHistory.index}`);
 
     try {
       const stateObj = JSON.parse(state);
@@ -212,7 +186,6 @@ export function useFabricCanvas({
         // Small delay to let Fabric.js finish
         setTimeout(() => {
           isUndoRedoRef.current = false;
-          console.log(`✅ [undo][${pageId}] Done`);
         }, 50);
       });
     } catch (error) {
@@ -232,15 +205,9 @@ export function useFabricCanvas({
     }
 
     const pageHistory = getCurrentPageHistory();
-    const pageId = currentPageIdRef.current;
-
-    console.log(
-      `↪️  [redo][${pageId}] index=${pageHistory.index}, historyLen=${pageHistory.history.length}`,
-    );
 
     // No more redo states
     if (pageHistory.index >= pageHistory.history.length - 1) {
-      console.log(`⛔ [redo][${pageId}] Nothing to redo`);
       return;
     }
 
@@ -248,7 +215,6 @@ export function useFabricCanvas({
     pageHistory.index++;
 
     const state = pageHistory.history[pageHistory.index];
-    console.log(`↪️  [redo][${pageId}] Restoring state #${pageHistory.index}`);
 
     try {
       const stateObj = JSON.parse(state);
@@ -260,7 +226,6 @@ export function useFabricCanvas({
         // Small delay to let Fabric.js finish
         setTimeout(() => {
           isUndoRedoRef.current = false;
-          console.log(`✅ [redo][${pageId}] Done`);
         }, 50);
       });
     } catch (error) {
@@ -1149,15 +1114,12 @@ export function useFabricCanvas({
       if (!canvas) return;
 
       // 🔑 Use the explicitly passed targetPageId first, then the live ref.
-      const pageId = targetPageId || currentPageIdRef.current;
 
       // Bump generation so any previous in-flight callback knows it is stale
       loadGenerationRef.current += 1;
       const myGeneration = loadGenerationRef.current;
 
-      console.log(
-        `📥 [loadFromJson] gen=${myGeneration} Loading for page "${pageId}" (targetPageId="${targetPageId}", refId="${currentPageIdRef.current}")`,
-      );
+      console.log(targetPageId);
 
       // Guard: suppress event-driven history saves during load
       isLoadingPageRef.current = true;
@@ -1181,9 +1143,6 @@ export function useFabricCanvas({
             history: [state],
             index: 0,
           });
-          console.log(
-            `🌱 [loadFromJson] gen=${myGeneration} Seeded history for page "${activePageId}" (index=0, len=1)`,
-          );
         } catch (error) {
           console.error(
             `❌ [loadFromJson] gen=${myGeneration} Failed to seed history for page "${activePageId}":`,
@@ -1213,9 +1172,6 @@ export function useFabricCanvas({
         setTimeout(() => {
           isUndoRedoRef.current = false;
           isLoadingPageRef.current = false;
-          console.log(
-            `✅ [loadFromJson] gen=${myGeneration} Guards released for page "${currentPageIdRef.current}"`,
-          );
         }, 150);
       });
 
@@ -1244,7 +1200,6 @@ export function useFabricCanvas({
     if (!canvas) return;
 
     const pageHistory = getCurrentPageHistory();
-    const pageId = currentPageIdRef.current;
 
     try {
       const json = canvas.toJSON();
@@ -1258,13 +1213,6 @@ export function useFabricCanvas({
       // Update current history state
       if (pageHistory.index >= 0) {
         pageHistory.history[pageHistory.index] = state;
-        console.log(
-          `💾 [saveCurrentPageState] Saved current state for page "${pageId}" at index ${pageHistory.index}`,
-        );
-      } else {
-        console.warn(
-          `⚠️ [saveCurrentPageState] No history to update for page "${pageId}" (index=${pageHistory.index})`,
-        );
       }
     } catch (error) {
       console.error("❌ Error saving page state:", error);
@@ -1280,15 +1228,6 @@ export function useFabricCanvas({
 
       // 🔑 FIX: Use the explicitly passed targetPageId first, then the live ref.
       const pageId = targetPageId || currentPageIdRef.current;
-      console.log(
-        `🔄 [loadPageState] Switching to page "${pageId}" (targetPageId="${targetPageId}", refId="${currentPageIdRef.current}")`,
-      );
-      console.log(
-        `🗂️  [loadPageState] pageHistoriesRef keys: [${Array.from(pageHistoriesRef.current.keys()).join(", ")}]`,
-      );
-      console.log(
-        `🗂️  [loadPageState] Target page has existing history: ${pageHistoriesRef.current.has(pageId)}`,
-      );
 
       // Guard: suppress all history saves during page load
       isLoadingPageRef.current = true;
@@ -1325,9 +1264,6 @@ export function useFabricCanvas({
               history: [state],
               index: 0,
             });
-            console.log(
-              `🌱 [loadPageState] Seeded initial history for new page "${pageId}"`,
-            );
           } catch {
             pageHistoriesRef.current.set(pageId, { history: [], index: -1 });
             console.warn(
@@ -1337,18 +1273,13 @@ export function useFabricCanvas({
         } else {
           // Page already has history — preserve it intact so undo/redo continues to work
           const existing = pageHistoriesRef.current.get(pageId)!;
-          console.log(
-            `♻️  [loadPageState] Restored existing history for page "${pageId}": index=${existing.index}, len=${existing.history.length}`,
-          );
+          console.log(existing);
         }
 
         // Small delay to let any queued event handlers fire (and be suppressed)
         setTimeout(() => {
           isUndoRedoRef.current = false;
           isLoadingPageRef.current = false;
-          console.log(
-            `✅ [loadPageState] Guards released for page "${pageId}"`,
-          );
         }, 150);
       });
     },
@@ -1357,7 +1288,6 @@ export function useFabricCanvas({
 
   // Remove history entries for a deleted page
   const clearPageHistory = useCallback((pageId: string) => {
-    console.log(`🗑️  [clearPageHistory] Clearing history for page "${pageId}"`);
     pageHistoriesRef.current.delete(pageId);
   }, []);
 
@@ -1421,10 +1351,6 @@ export function useFabricCanvas({
       setTimeout(() => {
         if (!isUndoRedoRef.current && !isLoadingPageRef.current) {
           saveHistoryRef.current();
-        } else {
-          console.log(
-            `⏸️  [handleHistoryEvent] Skipped — isUndoRedo=${isUndoRedoRef.current}, isLoadingPage=${isLoadingPageRef.current}`,
-          );
         }
       }, 100);
     };

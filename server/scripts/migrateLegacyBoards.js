@@ -21,11 +21,9 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 const migrateLegacyBoards = async () => {
   try {
-    console.log("🚀 Starting legacy board migration...\n");
 
     // Connect to database
     await mongoose.connect(MONGODB_URI);
-    console.log("✅ Connected to MongoDB\n");
 
     // Find boards without pages or with empty pages array
     const legacyBoards = await Board.find({
@@ -35,10 +33,8 @@ const migrateLegacyBoards = async () => {
       ]
     }).select("+canvasData"); // Include hidden canvasData field
 
-    console.log(`📊 Found ${legacyBoards.length} legacy boards to migrate\n`);
 
     if (legacyBoards.length === 0) {
-      console.log("✨ No legacy boards found. All boards are up to date!");
       await mongoose.disconnect();
       return;
     }
@@ -49,7 +45,6 @@ const migrateLegacyBoards = async () => {
     // Migrate each board
     for (const board of legacyBoards) {
       try {
-        console.log(`📝 Migrating board: ${board._id} - "${board.title}"`);
 
         // Create first page from legacy data
         const firstPage = new Page({
@@ -61,15 +56,12 @@ const migrateLegacyBoards = async () => {
         });
 
         await firstPage.save();
-        console.log(`   ✅ Created page: ${firstPage._id}`);
 
         // Update board with page reference
         board.pages = [firstPage._id];
         board.currentPageId = firstPage._id;
         await board.save();
 
-        console.log(`   ✅ Updated board with page reference`);
-        console.log(`   📄 Canvas data size: ${board.canvasData?.length || 0} bytes\n`);
 
         successCount++;
       } catch (error) {
@@ -78,14 +70,7 @@ const migrateLegacyBoards = async () => {
       }
     }
 
-    // Summary
-    console.log("\n" + "=".repeat(50));
-    console.log("📊 Migration Summary:");
-    console.log("=".repeat(50));
-    console.log(`✅ Successfully migrated: ${successCount} boards`);
-    console.log(`❌ Failed: ${errorCount} boards`);
-    console.log(`📈 Total processed: ${legacyBoards.length} boards`);
-    console.log("=".repeat(50) + "\n");
+    
 
     // Verify migration
     const remainingLegacy = await Board.countDocuments({
@@ -95,16 +80,10 @@ const migrateLegacyBoards = async () => {
       ]
     });
 
-    if (remainingLegacy === 0) {
-      console.log("✨ All boards successfully migrated!");
-    } else {
-      console.log(`⚠️  Warning: ${remainingLegacy} boards still need migration`);
-    }
+    
 
     // Disconnect
     await mongoose.disconnect();
-    console.log("\n✅ Disconnected from MongoDB");
-    console.log("🎉 Migration complete!\n");
 
   } catch (error) {
     console.error("\n❌ Migration failed:", error);

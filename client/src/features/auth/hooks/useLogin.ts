@@ -4,8 +4,8 @@ import type { FormErrors, LoginFormType } from "../types/types";
 import axios from "axios";
 import { getData } from "../../core/context/userContext";
 import { loginSchema } from "../loginSchema";
-import { useAppDispatch } from "@/store/hooks";
-import { clearBoardData } from "@/store/boardSlice";
+import { useAppDispatch } from "../../../store/hooks"
+import { clearBoardData } from "../../../store/boardSlice";
 
 export function useLogin() {
   const [myForm, setMyForm] = useState<LoginFormType>({

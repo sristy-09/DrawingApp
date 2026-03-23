@@ -158,19 +158,16 @@ export function useBoard() {
 
       // ─── FIX #2: drop saves queued before a page switch
       if (isSwitchingPageRef.current) {
-        console.log("⏭️  [saveBoard] Skipped — page switch in progress");
         return;
       }
 
       if (!forceImmediate) {
         if (isInteracting()) {
-          console.log("⏭️  [saveBoard] Skipped — user is interacting");
           return;
         }
         const timeSinceLastInteraction =
           Date.now() - lastInteractionTimeRef.current;
         if (timeSinceLastInteraction < 500) {
-          console.log("⏭️  [saveBoard] Skipped — interaction too recent");
           return;
         }
       }
@@ -449,12 +446,7 @@ export function useBoard() {
       canvas.off("path:created", handleCanvasChange);
       canvas.off("object:removed", handleCanvasChange);
     };
-  }, [
-    debouncedSave,
-    handleCanvasChange,
-    saveBoard,
-    activeDrawingTool,
-  ]);
+  }, [debouncedSave, handleCanvasChange, saveBoard, activeDrawingTool]);
 
   // Periodic save — only fires after genuine inactivity
   useEffect(() => {
